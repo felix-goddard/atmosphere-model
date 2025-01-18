@@ -3,8 +3,8 @@ module mod_sw_dyn
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
-    use mod_fields, only: is, ie, js, je, isd, ied, jsd, jed, &
-                          h, ud, vd
+    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
+    use mod_fields, only: h, ud, vd
 
     implicit none
     private
@@ -50,7 +50,7 @@ module mod_sw_dyn
     real(rk), allocatable :: left_edge(:), right_edge(:) ! edge values as calculated by the PPM
 
     integer, parameter :: PPM_UNCONSTRAINED = 0
-    integer, parameter :: PPM_CONSTRAINED = 0
+    integer, parameter :: PPM_CONSTRAINED = 1
         
 contains
 
@@ -331,14 +331,6 @@ contains
     end subroutine ppm
 
     subroutine allocate_sw_dyn_arrays()
-
-        if (.not. allocated(h)) then
-            write (log_str, '(a)') 'Prognostic arrays must be allocated before SW dynamics arrays'
-            call logger % fatal('allocate_sw_dyn_arrays', log_str)
-
-            ! This is because the allocation of the prognostics also involves
-            ! calculating the array bounds (is, ie, js, je), which we need here.
-        end if
 
         if (.not. allocated(vorticity))      allocate(vorticity     (is:ie, js:je))
         if (.not. allocated(kinetic_energy)) allocate(kinetic_energy(is:ie, js:je))

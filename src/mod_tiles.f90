@@ -1,11 +1,18 @@
 module mod_tiles
   
-    use mod_kinds, only: ik
+    use mod_kinds, only: ik, rk
+    use mod_config, only: config => main_config
   
     implicit none
   
     private
-    public :: tile_indices, tile_neighbors_2d
+    public :: init_tiles, neighbours, &
+              is, ie, js, je, isd, ied, jsd, jed, halo_width
+
+    integer(ik), parameter :: halo_width = 12
+    integer(ik) :: is, ie, js, je ! data bounds (including halo)
+    integer(ik) :: isd, ied, jsd, jed ! domain bounds (not including halo)
+    integer(ik) :: neighbours(8)
   
     interface tile_indices
       module procedure :: tile_indices_1d, tile_indices_2d
@@ -233,5 +240,26 @@ module mod_tiles
       ]
 
     end function tile_neighbors_2d
+
+    subroutine init_tiles()
+      integer(ik) :: indices(4), upper(2), lower(2)
+      integer(ik) :: i, j
+
+      indices = tile_indices([config % nx, config % ny])
+      lower = indices([1, 3])
+      upper = indices([2, 4])
+
+      isd = lower(1)
+      ied = upper(1)
+      jsd = lower(2)
+      jed = upper(2)
+
+      is = isd - halo_width
+      ie = ied + halo_width
+      js = jsd - halo_width
+      je = jed + halo_width
+
+      neighbours = tile_neighbors_2d(periodic=.true.)
+    end subroutine init_tiles
   
   end module mod_tiles

@@ -2,17 +2,16 @@ module mod_sync
 
     use mod_kinds, only: ik, rk
     use mod_config, only: config => main_config
-    use mod_tiles, only: tile_neighbors_2d
-    use mod_fields, only: is, ie, js, je, isd, ied, jsd, jed, halo_width, &
-                          h, ud, vd
+    use mod_tiles, only: neighbours, &
+                         is, ie, js, je, isd, ied, jsd, jed, halo_width
+    use mod_fields, only: h, ud, vd
 
     implicit none
 
     private
-    public :: halo_exchange, init_halo_sync
+    public :: halo_exchange, allocate_sync_buffers
 
     integer, parameter :: n_prognostics = 3
-    integer(ik) :: neighbours(8)
     real(rk), allocatable :: edge_buffer(:,:,:,:)[:]
     real(rk), allocatable :: corner_buffer(:,:,:,:)[:]
 
@@ -46,7 +45,6 @@ contains
         
     end subroutine halo_exchange
 
-
     subroutine copy_to_buffer(q, idx)
         real(rk), intent(in) :: q(is:ie,js:je)
         integer(ik), intent(in) :: idx
@@ -63,9 +61,8 @@ contains
             corner_buffer(i+1, :, 3, idx)[neighbours(7)] = q(isd+i, jsd:jsd+halo_width-1) ! lower left neighbour
             corner_buffer(i+1, :, 4, idx)[neighbours(8)] = q(ied-i, jsd:jsd+halo_width-1) ! lower right neighbour
         end do
-    
-    end subroutine copy_to_buffer
 
+    end subroutine copy_to_buffer
 
     subroutine copy_from_buffer(q, idx)
         real(rk), intent(inout) :: q(is:ie,js:je)
@@ -83,22 +80,19 @@ contains
             q(isd-i, js:jsd-1) = corner_buffer(i, :, 2, idx) ! lower left neighbour
             q(ied+i, js:jsd-1) = corner_buffer(i, :, 1, idx) ! lower right neighbour
         end do
-    
+
     end subroutine copy_from_buffer
 
+    subroutine allocate_sync_buffers()
 
-    subroutine init_halo_sync()
-    
         if (.not. allocated(edge_buffer)) &
             allocate(edge_buffer(                &
                 1:max(config % nx, config % ny), &
                 halo_width, 4, n_prognostics)[*] )
-    
+
         if (.not. allocated(corner_buffer)) &
             allocate(corner_buffer(halo_width, halo_width, 4, n_prognostics)[*])
-
-        neighbours = tile_neighbors_2d(periodic=.true.)
         
-    end subroutine init_halo_sync
+    end subroutine allocate_sync_buffers
 
 end module mod_sync

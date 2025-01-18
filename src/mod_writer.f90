@@ -3,8 +3,8 @@ module mod_writer
     use mod_kinds, only: ik, rk
     use mod_config, only: config => main_config
     use mod_io, only: write_time_slice, advance_time
-    use mod_fields, only: isd, ied, jsd, jed, &
-                          h, ud, vd
+    use mod_tiles, only: isd, ied, jsd, jed
+    use mod_fields, only: h, ud, vd
 
     implicit none
 
@@ -23,18 +23,19 @@ contains
 
         if (this_image() == 1) call advance_time(time)
 
+        ! Output height field
         call write(h(isd:ied, jsd:jed), 'h', time)
 
+        ! Output u wind
         do concurrent (i=isd:ied, j=jsd:jed)
             output_field(i,j) = .5 * (ud(i,j) + ud(i,j+1))
         end do
-
         call write(output_field, 'u', time)
 
+        ! Output v wind
         do concurrent (i=isd:ied, j=jsd:jed)
             output_field(i,j) = .5 * (vd(i,j) + vd(i+1,j))
         end do
-
         call write(output_field, 'v', time)
 
     end subroutine write_output

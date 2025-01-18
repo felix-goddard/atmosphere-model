@@ -4,9 +4,10 @@ module mod_model
     use mod_log, only: logger => main_logger, log_str
     use mod_timing, only: timing_on, timing_off
     use mod_config, only: config => main_config
+    use mod_tiles, only: init_tiles
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
-    use mod_sync, only: halo_exchange, init_halo_sync
+    use mod_sync, only: halo_exchange, allocate_sync_buffers
     use mod_writer, only: write_output, allocate_writer
 
     implicit none
@@ -18,9 +19,10 @@ contains
     
     subroutine init_model()
 
+        call init_tiles()
         call init_prognostic_fields()
         call allocate_sw_dyn_arrays()
-        call init_halo_sync()
+        call allocate_sync_buffers()
         call allocate_writer()
 
         call halo_exchange()

@@ -2,17 +2,12 @@ module mod_fields
 
     use mod_kinds, only: ik, rk
     use mod_config, only: config => main_config
-    use mod_tiles, only: tile_indices
+    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
 
     implicit none
     private
 
-    integer(ik), parameter :: halo_width = 12
-    integer(ik) :: is, ie, js, je ! data bounds (including halo)
-    integer(ik) :: isd, ied, jsd, jed ! domain bounds (not including halo)
-
-    public :: init_prognostic_fields, &
-              is, ie, js, je, isd, ied, jsd, jed, halo_width
+    public :: init_prognostic_fields
 
     real(rk), allocatable :: h(:,:)  ! prognostic height
     real(rk), allocatable :: ud(:,:) ! prognostic u wind (on D grid)
@@ -23,26 +18,10 @@ module mod_fields
 contains
 
     subroutine init_prognostic_fields()
-        integer(ik) :: indices(4), upper(2), lower(2)
-        integer(ik) :: i, j
-
+        integer :: i, j
         real(rk), parameter :: height = 10
         real(rk), parameter :: ic = .5, jc = .5
         real(rk), parameter :: decay = 500
-        
-        indices = tile_indices([config % nx, config % ny])
-        lower = indices([1, 3])
-        upper = indices([2, 4])
-
-        isd = lower(1)
-        ied = upper(1)
-        jsd = lower(2)
-        jed = upper(2)
-
-        is = isd - halo_width
-        ie = ied + halo_width
-        js = jsd - halo_width
-        je = jed + halo_width
 
         if (.not. allocated(h))  allocate(h (is:ie, js:je))
         if (.not. allocated(ud)) allocate(ud(is:ie, js:je))
