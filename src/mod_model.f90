@@ -5,7 +5,7 @@ module mod_model
     use mod_config, only: config => main_config
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
-    use mod_sync, only: sync_halos, init_halo_sync
+    use mod_sync, only: halo_exchange, init_halo_sync
     use mod_writer, only: write_output, allocate_writer
 
     implicit none
@@ -20,7 +20,7 @@ contains
         call init_prognostic_fields()
         call allocate_sw_dyn_arrays()
         call init_halo_sync()
-        call sync_halos()
+        call halo_exchange()
         call allocate_writer()
 
     end subroutine init_model
@@ -54,7 +54,7 @@ contains
 
             call sw_dynamics_step(config % dt)
 
-            call sync_halos()
+            call halo_exchange()
 
             call write_output(n * config % dt)
         
