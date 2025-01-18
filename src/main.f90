@@ -2,6 +2,7 @@ program main
   
     use mod_io, only: init_io, finalise_io
     use mod_log, only: init_logging, logger => main_logger, log_error
+    use mod_timing, only: init_timing, print_timing
     use mod_config, only: init_config
     use mod_model, only: init_model, run_model
   
@@ -12,6 +13,11 @@ program main
       call init_logging('log/log.out', 'log/log.err', output_level=log_error)
       call logger % info('main', 'Initialised logger')
     end if
+
+    ! Initialise timing
+    call init_timing()
+    if (this_image() == 1) &
+      call logger % info('main', 'Initialised timer')
 
     ! Load the configuration file; this is needed for model setup.
     call init_config('config.nml')
@@ -35,8 +41,10 @@ program main
     ! Run the model according to the config.
     call run_model()
 
-    ! Close the output netCDF file cleanly.
-    if (this_image() == 1) &
+    ! Close the output netCDF file cleanly and print timing information.
+    if (this_image() == 1) then
       call finalise_io()
+      call print_timing()
+    end if
   
   end program main

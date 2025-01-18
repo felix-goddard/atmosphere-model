@@ -2,6 +2,7 @@ module mod_model
 
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
+    use mod_timing, only: timing_on, timing_off
     use mod_config, only: config => main_config
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
@@ -56,11 +57,17 @@ contains
                 call logger % info('run_model', log_str)
             end if
 
+            call timing_on('SW_DYN')
             call sw_dynamics_step(config % dt)
+            call timing_off('SW_DYN')
 
+            call timing_on('HALO')
             call halo_exchange()
+            call timing_off('HALO')
 
+            call timing_on('OUTPUT')
             call write_output(n * config % dt)
+            call timing_off('OUTPUT')
         
         end do time_loop
 
