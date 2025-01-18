@@ -20,7 +20,7 @@ contains
         real(rk), intent(in) :: time
         integer :: i, j
 
-        call advance_time(time)
+        if (this_image() == 1) call advance_time(time)
 
         call write(h(isd:ied, jsd:jed), 'h', time)
 
