@@ -77,15 +77,19 @@ contains
 
         if (level >= self % error_level) then
             write (self % error_unit, '(a)') trim(log_str)
+            flush (self % error_unit)
         else
             write (self % output_unit, '(a)') trim(log_str)
+            flush (self % output_unit)
         end if
 
         if (level >= self % output_level) then
             if (level >= self % error_level) then
                 write (stderr, '(a)') trim(log_str)
+                flush (stderr)
             else
                 write (stdout, '(a)') trim(log_str)
+                flush (stdout)
             end if
         end if
         
