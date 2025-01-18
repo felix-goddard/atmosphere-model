@@ -3,12 +3,10 @@ module mod_model
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
-    use mod_io, only: write_time_slice
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
     use mod_sync, only: sync_halos, init_halo_sync
-
-    use mod_fields, only: isd, ied, jsd, jed, h
+    use mod_writer, only: write_output, allocate_writer
 
     implicit none
 
@@ -23,6 +21,7 @@ contains
         call allocate_sw_dyn_arrays()
         call init_halo_sync()
         call sync_halos()
+        call allocate_writer()
 
     end subroutine init_model
 
@@ -57,28 +56,10 @@ contains
 
             call sync_halos()
 
-            call write(h, n * config % dt)
+            call write_output(n * config % dt)
         
         end do time_loop
 
     end subroutine run_model
-
-    subroutine write(field, time)
-        real(rk), intent(in) :: field(:,:)
-        real(rk), intent(in) :: time
-        real(rk), allocatable :: gather_coarray(:,:)[:]
-        real(rk), allocatable :: gather(:,:)
-        
-        allocate(gather_coarray(isd:ied, jsd:jed)[*])
-
-        gather_coarray(:,:)[1] = field(isd:ied, jsd:jed)
-        sync all
-        if (this_image() == 1) then
-            allocate(gather(isd:ied, jsd:jed))
-
-            gather = gather_coarray
-            call write_time_slice(gather, config % nx, config % ny, 'h', time)
-        end if
-    end subroutine write
 
 end module mod_model

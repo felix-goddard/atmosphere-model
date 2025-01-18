@@ -30,22 +30,19 @@ contains
         real(rk), parameter :: ic = .5, jc = .5
         real(rk), parameter :: decay = 500
         
-        indices = tile_indices([          &
-            config % nx + 2 * halo_width, &
-            config % ny + 2 * halo_width  ])
-
+        indices = tile_indices([config % nx, config % ny])
         lower = indices([1, 3])
         upper = indices([2, 4])
 
-        is = lower(1)
-        ie = upper(1)
-        js = lower(2)
-        je = upper(2)
+        isd = lower(1)
+        ied = upper(1)
+        jsd = lower(2)
+        jed = upper(2)
 
-        isd = is + halo_width
-        ied = ie - halo_width
-        jsd = js + halo_width
-        jed = je - halo_width
+        is = isd - halo_width
+        ie = ied + halo_width
+        js = jsd - halo_width
+        je = jed + halo_width
 
         if (.not. allocated(h))  allocate(h (is:ie, js:je))
         if (.not. allocated(ud)) allocate(ud(is:ie, js:je))
@@ -55,7 +52,7 @@ contains
         h(:,:) = 0.
         do concurrent (i=isd:ied, j=jsd:jed)
             h(i,j) = 10000. + height * exp( &
-                -decay * ((real(i-isd)/config % nx - ic)**2 + (real(j-jsd)/config % ny - jc)**2))
+                -decay * ((real(i)/config % nx - ic)**2 + (real(j)/config % ny - jc)**2))
         end do
 
         ud(:,:) = 0.

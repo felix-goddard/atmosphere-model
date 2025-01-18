@@ -30,3 +30,12 @@ def update(t):
 
 ani = FuncAnimation(fig, update, frames=data.t.values, init_func=init, interval=20)
 plt.show()
+
+plt.pcolormesh(data.x, data.y, data.u.isel(t=10))
+plt.show()
+
+# mass = data.h.sum(['x', 'y'])
+# plt.plot(data.t / 3600, mass / mass[0] - 1)
+# plt.xlim(data.t.min() / 3600, data.t.max() / 3600)
+# plt.xlabel(r'$t$ (h)')
+# plt.show()

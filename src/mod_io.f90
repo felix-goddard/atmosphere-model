@@ -12,7 +12,7 @@ module mod_io
     implicit none
   
     private
-    public :: init_io, finalise_io, write_time_slice
+    public :: init_io, finalise_io, write_time_slice, advance_time
 
     integer(ik) :: ncid
     integer(ik) :: dimid_t, dimid_x, dimid_y
@@ -30,7 +30,7 @@ module mod_io
       ysize = config % ny
       dx = config % dx
       dy = config % dy
-      time_index = 1
+      time_index = 0 ! since we call advance_time before ever writing, start it at 0
 
       status = nf90_create(path='output/output.nc', cmode=nf90_clobber, ncid=ncid)
       call handle_netcdf_error(status)
@@ -87,17 +87,23 @@ module mod_io
         call logger % fatal('handle_netcdf_error', log_str)
       end if
     end subroutine handle_netcdf_error
-  
-    subroutine write_time_slice(field, nx, ny, fieldname, time)
-      ! Writes a field into a binary file.
-      real(rk), intent(in) :: field(:,:)
-      integer(ik), intent(in) :: nx, ny
-      character(len=*), intent(in) :: fieldname
+
+    subroutine advance_time(time)
       real(rk), intent(in) :: time
-      integer(ik) :: status, varid
+      integer(ik) :: status
+
+      time_index = time_index + 1
 
       status = nf90_put_var( ncid, varid_t, time, start=[time_index] )
       call handle_netcdf_error(status)
+      
+    end subroutine advance_time
+  
+    subroutine write_time_slice(field, fieldname)
+      ! Writes a field into a binary file.
+      real(rk), intent(in) :: field(:,:)
+      character(len=*), intent(in) :: fieldname
+      integer(ik) :: status, varid
 
       select case (fieldname)
       case ('h')
@@ -111,14 +117,12 @@ module mod_io
         stop "Stopped"
       end select
 
-      status = nf90_put_var(          &
-        ncid, varid, field,           &
-        start = [ 1, 1, time_index ], &
-        count = [ nx, ny, 1        ]  )
+      status = nf90_put_var(                          &
+        ncid, varid, field,                           &
+        start = [ 1, 1, time_index ],                 &
+        count = [ size(field, 1), size(field, 2), 1 ] )
 
       call handle_netcdf_error(status)
-
-      time_index = time_index + 1
 
     end subroutine write_time_slice
   
