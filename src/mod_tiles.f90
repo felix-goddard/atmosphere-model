@@ -1,12 +1,11 @@
-module mod_parallel
+module mod_tiles
   
     use mod_kinds, only: ik
   
     implicit none
   
     private
-    public :: num_tiles, tile_indices, tile_neighbors_1d, &
-              tile_neighbors_2d
+    public :: tile_indices, tile_neighbors_2d
   
     interface tile_indices
       module procedure :: tile_indices_1d, tile_indices_2d
@@ -14,58 +13,36 @@ module mod_parallel
   
   contains
   
-    pure function denominators(n)
-      ! Returns all common denominators of n.
+    pure function divisors(n)
+      ! Returns all integer divisors of n.
       integer(ik), intent(in) :: n
-      integer(ik), allocatable :: denominators(:)
+      integer(ik), allocatable :: divisors(:)
       integer(ik) :: i
-      denominators = [integer(ik) ::]
+      divisors = [integer(ik) ::]
       do i = 1, n
-        if (mod(n, i) == 0) denominators = [denominators, i]
+        if (mod(n, i) == 0) divisors = [divisors, i]
       end do
-    end function denominators
+    end function divisors
   
     pure function num_tiles(n)
       ! Returns the optimal number of tiles in 2 dimensions
       ! given total number of tiles n.
-      !
-      ! Examples:
-      !   * num_tiles(1) = [1, 1]
-      !   * num_tiles(2) = [2, 1]
-      !   * num_tiles(3) = [3, 1]
-      !   * num_tiles(4) = [2, 2]
-      !   * num_tiles(5) = [5, 1]
-      !   * num_tiles(6) = [3, 2]
-      !
+
       integer(ik), intent(in) :: n
       integer(ik) :: num_tiles(2)
-      integer(ik), allocatable :: denoms(:)
-      integer(ik), allocatable :: dim1(:), dim2(:)
-      integer(ik) :: i, j, n1, n2
+      integer(ik), allocatable :: divs(:)
+      integer(ik) :: dim1, dim2
+      integer(ik) :: i, j
   
-      ! find all common denominators of the total number of images
-      denoms = denominators(n)
-  
-      ! find all combinations of common denominators
-      ! whose product equals the total number of images
-      dim1 = [integer(ik) ::]
-      dim2 = [integer(ik) ::]
-      do j = 1, size(denoms)
-        do i = 1, size(denoms)
-          if (denoms(i) * denoms(j) == n) then
-            dim1 = [dim1, denoms(i)]
-            dim2 = [dim2, denoms(j)]
-          end if
-        end do
-      end do
-  
-      ! pick the set of common denominators with the minimal norm
-      ! between two elements -- rectangle closest to a square
-      num_tiles = [dim1(1), dim2(1)]
-      do i = 2, size(dim1)
-        n1 = norm2([dim1(i), dim2(i)] - sqrt(real(n)))
-        n2 = norm2(num_tiles - sqrt(real(n)))
-        if (n1 < n2) num_tiles = [dim1(i), dim2(i)]
+      divs = divisors(n)
+
+      num_tiles = [1, n]
+      do i = 1, size(divs)
+        dim1 = n / divs(i)
+        dim2 = divs(i)
+        if (dim1 + dim2 < num_tiles(1) + num_tiles(2)) then
+          num_tiles = [dim1, dim2]
+        end if
       end do
   
     end function num_tiles
@@ -73,6 +50,7 @@ module mod_parallel
     pure function tile_indices_1d(dims, i, n) result(indices)
       ! Given input global array size, return start and end index
       ! of a parallel 1-d tile that correspond to this image.
+
       integer(ik), intent(in) :: dims, i, n
       integer(ik) :: indices(2)
       integer(ik) :: offset, tile_size
@@ -96,9 +74,11 @@ module mod_parallel
     pure function tile_indices_2d(dims) result(indices)
       ! Given an input x- and y- dimensions of the total computational domain [im, jm].
       ! returns an array of start and end indices in x- and y-, [is, ie, js, je].
+
       integer(ik), intent(in) :: dims(2)
       integer(ik) :: indices(4)
       integer(ik) :: tiles(2), tiles_ij(2)
+
       tiles = num_tiles(num_images())
       tiles_ij = tile_n2ij(this_image())
       indices(1:2) = tile_indices_1d(dims(1), tiles_ij(1), tiles(1))
@@ -109,8 +89,10 @@ module mod_parallel
     pure function tile_neighbors_1d() result(neighbors)
       ! Returns the image indices corresponding
       ! to left and right neighbor tiles.
+
       integer(ik) :: neighbors(2)
       integer(ik) :: left, right
+
       if (num_images() > 1) then
         left = this_image() - 1
         right = this_image() + 1
@@ -143,8 +125,10 @@ module mod_parallel
       !   * tile_n2ij(4) = [1, 2]
       !   * tile_n2ij(6) = [3, 2]
       !
+
       integer(ik), intent(in) :: n
       integer(ik) :: ij(2), i, j, tiles(2)
+
       if (n == 0) then
         ij = 0
       else
@@ -172,8 +156,10 @@ module mod_parallel
       !   * tile_ij2n([1, 2]) = 4
       !   * tile_ij2n([3, 2]) = 6
       !
+
       integer(ik), intent(in) :: ij(2)
       integer(ik) :: n, tiles(2)
+
       if (any(ij == 0)) then
         n = 0
       else
@@ -185,11 +171,12 @@ module mod_parallel
   
     pure function tile_neighbors_2d(periodic) result(neighbors)
       ! Returns the neighbor image indices given.
+
       logical, intent(in) :: periodic
-      integer(ik) :: neighbors(4)
+      integer(ik) :: neighbors(8)
       integer(ik) :: tiles(2), tiles_ij(2), itile, jtile
-      integer(ik) :: left, right, down, up
-      integer(ik) :: ij_left(2), ij_right(2), ij_down(2), ij_up(2)
+      integer(ik) :: ij_L(2), ij_R(2), ij_D(2), ij_U(2), &
+                     ij_UL(2), ij_UR(2), ij_DL(2), ij_DR(2)
   
       tiles = num_tiles(num_images())
       tiles_ij = tile_n2ij(this_image())
@@ -197,32 +184,54 @@ module mod_parallel
       jtile = tiles_ij(2)
   
       ! i, j tile indices for each of the neighbors
-      ij_left = [itile - 1, jtile]
-      ij_right = [itile + 1, jtile]
-      ij_down = [itile, jtile - 1]
-      ij_up = [itile, jtile + 1]
+      ij_L = [itile - 1, jtile]
+      ij_R = [itile + 1, jtile]
+      ij_D = [itile, jtile - 1]
+      ij_U = [itile, jtile + 1]
+      ij_UL = [itile - 1, jtile + 1]
+      ij_UR = [itile + 1, jtile + 1]
+      ij_DL = [itile - 1, jtile - 1]
+      ij_DR = [itile + 1, jtile - 1]
   
       if (periodic) then
         ! set neighbor to wrap around the edge
-        if (ij_left(1) < 1) ij_left(1) = tiles(1)
-        if (ij_right(1) > tiles(1)) ij_right(1) = 1
-        if (ij_down(2) < 1) ij_down(2) = tiles(2)
-        if (ij_up(2) > tiles(2)) ij_up(2) = 1
+        if (ij_L(1) < 1) ij_L(1) = tiles(1)
+        if (ij_R(1) > tiles(1)) ij_R(1) = 1
+        if (ij_UL(1) < 1) ij_UL(1) = tiles(1)
+        if (ij_UR(1) > tiles(1)) ij_UR(1) = 1
+        if (ij_DL(1) < 1) ij_DL(1) = tiles(1)
+        if (ij_DR(1) > tiles(1)) ij_DR(1) = 1
+
+        if (ij_D(2) < 1) ij_D(2) = tiles(2)
+        if (ij_U(2) > tiles(2)) ij_U(2) = 1
+        if (ij_DL(2) < 1) ij_DL(2) = tiles(2)
+        if (ij_UL(2) > tiles(2)) ij_UL(2) = 1
+        if (ij_DR(2) < 1) ij_DR(2) = tiles(2)
+        if (ij_UR(2) > tiles(2)) ij_UR(2) = 1
       else
         ! set neighbor to 0 -- no neighbor
-        if (ij_left(1) < 1) ij_left = 0
-        if (ij_right(1) > tiles(1)) ij_right = 0
-        if (ij_down(2) < 1) ij_down = 0
-        if (ij_up(2) > tiles(2)) ij_up = 0
+        if (ij_L(1) < 1) ij_L(1) = 0
+        if (ij_R(1) > tiles(1)) ij_R(1) = 0
+        if (ij_UL(1) < 1) ij_UL(1) = 0
+        if (ij_UR(1) > tiles(1)) ij_UR(1) = 0
+        if (ij_DL(1) < 1) ij_DL(1) = 0
+        if (ij_DR(1) > tiles(1)) ij_DR(1) = 0
+
+        if (ij_D(2) < 1) ij_D(2) = 0
+        if (ij_U(2) > tiles(2)) ij_U(2) = 0
+        if (ij_DL(2) < 1) ij_DL(2) = 0
+        if (ij_UL(2) > tiles(2)) ij_UL(2) = 0
+        if (ij_DR(2) < 1) ij_DR(2) = 0
+        if (ij_UR(2) > tiles(2)) ij_UR(2) = 0
       end if
   
-      left = tile_ij2n(ij_left)
-      right = tile_ij2n(ij_right)
-      down = tile_ij2n(ij_down)
-      up = tile_ij2n(ij_up)
-  
-      neighbors = [left, right, down, up]
-  
+      neighbors = [ &
+        tile_ij2n(ij_L), tile_ij2n(ij_R), &
+        tile_ij2n(ij_D), tile_ij2n(ij_U), &
+        tile_ij2n(ij_UL), tile_ij2n(ij_UR), &
+        tile_ij2n(ij_DL), tile_ij2n(ij_DR)  &
+      ]
+
     end function tile_neighbors_2d
   
-  end module mod_parallel
+  end module mod_tiles

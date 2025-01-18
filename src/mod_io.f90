@@ -2,6 +2,7 @@ module mod_io
 
     use iso_fortran_env, only: stderr => error_unit
     use mod_kinds, only: ik, rk
+    use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
     use netcdf, only: &
       nf90_create, nf90_def_dim, nf90_def_var, nf90_float, nf90_put_var,    &
@@ -11,11 +12,12 @@ module mod_io
     implicit none
   
     private
-    public :: init_io, finalise_io, write_field
+    public :: init_io, finalise_io, write_time_slice
 
     integer(ik) :: ncid
     integer(ik) :: dimid_t, dimid_x, dimid_y
     integer(ik) :: varid_t, varid_x, varid_y, varid_h, varid_u, varid_v
+    integer(ik) :: time_index
   
   contains
 
@@ -26,10 +28,11 @@ module mod_io
 
       xsize = config % nx
       ysize = config % ny
-      dx = config % Lx / (config % nx - 1)
-      dy = config % Ly / (config % ny - 1)
+      dx = config % dx
+      dy = config % dy
+      time_index = 1
 
-      status = nf90_create(path='output/tsunami.nc', cmode=nf90_clobber, ncid=ncid)
+      status = nf90_create(path='output/output.nc', cmode=nf90_clobber, ncid=ncid)
       call handle_netcdf_error(status)
 
       status = nf90_def_dim(ncid, 't', nf90_unlimited, dimid_t)
@@ -80,40 +83,43 @@ module mod_io
       integer(ik), intent(in) :: errcode
 
       if (errcode /= nf90_noerr) then
-        write (stderr, *) trim(nf90_strerror(errcode))
-        stop "Stopped"
+        write (log_str, *) trim(nf90_strerror(errcode))
+        call logger % fatal('handle_netcdf_error', log_str)
       end if
     end subroutine handle_netcdf_error
   
-    subroutine write_field(field, nx, ny, fieldname, time)
+    subroutine write_time_slice(field, nx, ny, fieldname, time)
       ! Writes a field into a binary file.
-      real(rk),     intent(in) :: field(:,:)
-      integer(ik),   intent(in) :: nx, ny
+      real(rk), intent(in) :: field(:,:)
+      integer(ik), intent(in) :: nx, ny
       character(len=*), intent(in) :: fieldname
-      integer(ik),   intent(in) :: time
+      real(rk), intent(in) :: time
       integer(ik) :: status, varid
 
-      status = nf90_put_var( ncid, varid_t, time * config % dt, start=[time] )
+      status = nf90_put_var( ncid, varid_t, time, start=[time_index] )
       call handle_netcdf_error(status)
 
-      if (fieldname == 'h') then
+      select case (fieldname)
+      case ('h')
         varid = varid_h
-      else if (fieldname == 'u') then
+      case ('u')
         varid = varid_u
-      else if (fieldname == 'v') then
+      case ('v')
         varid = varid_v
-      else
+      case default
         write (stderr, *) ('Unknown output variable ' // fieldname)
         stop "Stopped"
-      end if
+      end select
 
-      status = nf90_put_var(       &
-        ncid, varid, field,        &
-        start = [ 1, 1, time ],    &
-        count = [ nx, ny, 1 ]      )
+      status = nf90_put_var(          &
+        ncid, varid, field,           &
+        start = [ 1, 1, time_index ], &
+        count = [ nx, ny, 1        ]  )
 
       call handle_netcdf_error(status)
 
-    end subroutine write_field
+      time_index = time_index + 1
+
+    end subroutine write_time_slice
   
   end module mod_io

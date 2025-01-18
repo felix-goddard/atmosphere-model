@@ -6,7 +6,8 @@ module mod_log
     implicit none
 
     private
-    public :: init_logging, main_logger, log_str, log_fatal, log_error, log_warning, log_info, log_debug
+    public :: init_logging, main_logger, log_str, &
+        log_fatal, log_error, log_warning, log_info, log_debug
 
     type :: Logger
 
@@ -37,8 +38,8 @@ contains
 
     subroutine init_logging(output_file, error_file, output_level, error_level)
         character(*), intent(in) :: output_file, error_file
-        integer(ik), intent(in out), optional :: output_level
-        integer(ik), intent(in out), optional :: error_level
+        integer(ik), intent(in), optional :: output_level
+        integer(ik), intent(in), optional :: error_level
         integer(ik) :: level_1, level_2
         integer(ik) :: output_unit, error_unit
 
@@ -86,6 +87,12 @@ contains
             else
                 write (stdout, '(a)') trim(log_str)
             end if
+        end if
+        
+        if (level >= log_fatal) then
+            close (unit=self % output_unit)
+            close (unit=self % error_unit)
+            stop 'Fatal error'
         end if
     end subroutine handle_message
 

@@ -1,4 +1,4 @@
-# Tsunami
+# Model
 
 This codebase implements a parallelised Fortran model of the shallow water equations. It is built off the code provided as companion to [Modern Fortran: Building Efficient Parallel Applications](https://github.com/modern-fortran/tsunami) which I have extended and refactored in various ways.
 
@@ -12,8 +12,8 @@ Otherwise, the code can be built simply by running
 ```bash
 make
 ```
-from the base directory of the file tree. The resulting binary, `tsunami`, can then be run with
+from the base directory of the file tree. The resulting binary, `model`, can then be run with
 ```bash
-cafrun -n [cores] ./tsunami
+cafrun -n [cores] ./model
 ```
 where `[cores]` should be replaced with the number of cores to run the script on in parallel, e.g. `1` for serial execution.

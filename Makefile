@@ -1,31 +1,36 @@
 fc := caf
-fcflags := -O3 -I/opt/homebrew/include
+fcflags := -O3 -I/opt/homebrew/include -fbackslash -g # -fbounds-check
 fclibs := -L/opt/homebrew/lib/ -L/opt/homebrew/include -lnetcdff
 rm := rm -f
 
-proj_name := tsunami
+proj_name := model
 
-src := src
-sources := $(wildcard $(src)/*.f90)
+srcdir := src
+sources := $(wildcard $(srcdir)/*.f90)
 
-obj := build
-objects = $(sources:$(src)/%.f90=$(obj)/%.o)
+objdir := build
+objects = $(sources:$(srcdir)/%.f90=$(objdir)/%.o)
 
 .PHONY: all clean
 
 all: $(proj_name)
 
 $(proj_name): $(objects)
-	$(fc) $(fcflags) $(fclibs) $(objects) -I$(obj) -o $(proj_name)
+	$(fc) $(fcflags) $(fclibs) $(objects) -I$(objdir) -o $(proj_name)
 
-$(obj)/%.o: $(src)/%.f90
-	$(fc) $(fcflags) -J$(obj) -c $< -o $@
+$(objdir)/%.o: $(srcdir)/%.f90
+	$(fc) $(fcflags) -J$(objdir) -c $< -o $@
 
 %.o: %.mod
 
-$(objects): $(obj)/mod_kinds.o
-$(obj)/mod_model.o: $(src)/mod_model.f90 $(obj)/mod_log.o
-$(obj)/mod_field.o: $(src)/mod_field.f90 $(obj)/mod_io.o $(obj)/mod_parallel.o $(obj)/mod_diff.o
+$(objects): $(objdir)/mod_kinds.o
+$(objdir)/mod_io.o: $(srcdir)/mod_io.f90 $(objdir)/mod_log.o
+$(objdir)/mod_config.o: $(srcdir)/mod_config.f90 $(objdir)/mod_log.o
+$(objdir)/mod_sync.o: $(srcdir)/mod_sync.f90 $(objdir)/mod_fields.o
+$(objdir)/mod_sw_dyn.o: $(srcdir)/mod_sw_dyn.f90 $(objdir)/mod_fields.o
+$(objdir)/mod_model.o: $(srcdir)/mod_model.f90 $(objdir)/mod_sw_dyn.o $(objdir)/mod_sync.o $(objdir)/mod_log.o
+$(objdir)/mod_fields.o: $(srcdir)/mod_fields.f90 $(objdir)/mod_tiles.o
+$(objdir)/main.o: $(objects)
 
 clean:
 	$(rm) $(proj_name) build/*

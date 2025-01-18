@@ -3,67 +3,82 @@ module mod_model
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
-    use mod_field, only: Field, diffx, diffy
+    use mod_io, only: write_time_slice
+    use mod_fields, only: init_prognostic_fields
+    use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
+    use mod_sync, only: sync_halos, init_halo_sync
+
+    use mod_fields, only: isd, ied, jsd, jed, h
 
     implicit none
 
     private
     public :: init_model, run_model
 
-    type(Field) :: h, u, v
 contains
     
     subroutine init_model()
-        integer(ik) :: i, j
-        integer(ik), parameter :: ic = 51, jc = 51
-        real(rk), parameter :: decay = 0.02
 
-        u = Field('u', [config % nx, config % ny])
-        v = Field('v', [config % nx, config % ny])
-        h = Field('h', [config % nx, config % ny])
-
-        ! initialize a gaussian blob in the center
-        do concurrent(i = h % lb(1)-1:h % ub(1)+1,&
-            j = h % lb(2)-1:h % ub(2)+1)
-            h % data(i, j) = exp(-decay * ((i - ic)**2 + (j - jc)**2))
-        end do
-        call h % sync_edges()
+        call init_prognostic_fields()
+        call allocate_sw_dyn_arrays()
+        call init_halo_sync()
+        call sync_halos()
 
     end subroutine init_model
 
     subroutine run_model()
         integer(ik) :: n
-        real(rk) :: dt, dx, dy
-        real(rk) :: g, hm
 
-        dt = config % dt
-        dx = config % Lx / (config % nx - 1)
-        dy = config % Ly / (config % ny - 1)
-        g = config % gravity
-        hm = config % mean_depth
+        if (this_image() == 1) then
+            write (log_str, '(2(a,f6.1),a,f6.3,a)') &
+                'Δx = ', (config % dx / 1e3),       &
+                ' km; Δy = ', (config % dy / 1e3),  &
+                ' km; Δt = ', (config % dt / 60.), ' min.'
+            call logger % info('run_model', log_str)
+
+            write (log_str, '(a,f10.2,a)') &
+                'Max. wavespeed is ', min(config % dx, config % dy) / config % dt, ' m/s'
+            call logger % info('run_model', log_str)
+
+            write (log_str, '(a,f6.2,a,i6,a)') &
+                'Running to t = ', (config % nt * config % dt / 3600.), &
+                ' h; will perform ', config % nt, ' steps'
+            call logger % info('run_model', log_str)
+        end if
 
         time_loop: do n = 1, config % nt
   
             if (this_image() == 1) then
                 write (log_str, '(2(a,i6))') 'Computing time step', n, ' /', config % nt
-                call logger % info('main', log_str)
+                call logger % info('run_model', log_str)
             end if
-        
-            u = u - (u * diffx(u) / dx + v * diffy(u) / dy &
-                + g * diffx(h) / dx) * dt
-            call u % sync_edges()
-        
-            v = v - (u * diffx(v) / dx + v * diffy(v) / dy &
-                + g * diffy(h) / dy) * dt
-            call v % sync_edges()
-        
-            h = h - (diffx(u * (hm + h)) / dx + diffy(v * (hm + h)) / dy) * dt
-            call h % sync_edges()
-        
-            call h % write(n)
+
+            call sw_dynamics_step(config % dt)
+
+            call sync_halos()
+
+            call write(h, n * config % dt)
         
         end do time_loop
 
     end subroutine run_model
+
+    subroutine write(field, time)
+        real(rk), intent(in) :: field(:,:)
+        real(rk), intent(in) :: time
+        real(rk), allocatable :: gather_coarray(:,:)[:]
+        real(rk), allocatable :: gather(:,:)
+        
+        allocate(gather_coarray(isd:ied, jsd:jed)[*])
+
+        gather_coarray(:,:)[1] = field(isd:ied, jsd:jed)
+        sync all
+        if (this_image() == 1) then
+            allocate(gather(isd:ied, jsd:jed))
+
+            gather = gather_coarray
+            call write_time_slice(gather, config % nx, config % ny, 'h', time)
+        end if
+    end subroutine write
 
 end module mod_model
