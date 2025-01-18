@@ -8,9 +8,9 @@ module mod_timing
    private
    public :: timing_on, timing_off, init_timing, print_timing
 
-   integer, parameter :: max_blocks = 100
-   integer, parameter :: max_label_length = 20
-   integer :: n_blocks = 0
+   integer(ik), parameter :: max_blocks = 100
+   integer(ik), parameter :: max_label_length = 20
+   integer(ik) :: n_blocks = 0
 
    integer(ik) :: n_times(max_blocks)
 
@@ -35,7 +35,7 @@ contains
 
     function get_index(label) result(idx)
         character (len=*), intent(in) :: label
-        integer :: idx, i
+        integer(ik) :: idx, i
 
         idx = -1
         do i = 1, n_blocks
@@ -52,8 +52,8 @@ contains
 
     subroutine timing_on(label)
         character(len=*), intent(in) :: label
-        integer :: idx
-        real(rk) :: times(2), total_time
+        integer(ik) :: idx
+        real :: times(2), total_time
 
         call etime(times, total_time)
 
@@ -65,8 +65,8 @@ contains
 
     subroutine timing_off(label)
         character(len=*), intent(in) :: label
-        integer :: idx
-        real(rk) :: times(2), total_time
+        integer(ik) :: idx
+        real :: times(2), total_time
 
         call etime(times, total_time)
 
@@ -85,7 +85,7 @@ contains
     end subroutine timing_off
 
     subroutine print_timing()
-        integer :: i
+        integer(ik) :: i
         character(len=1) :: nl
         character(len=6) :: format_str
 

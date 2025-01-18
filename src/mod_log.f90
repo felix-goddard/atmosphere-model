@@ -66,7 +66,7 @@ contains
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: message
         integer(ik), intent(in) :: level
-        integer :: datetime(8)
+        integer(ik) :: datetime(8)
 
         call date_and_time(values=datetime)
 

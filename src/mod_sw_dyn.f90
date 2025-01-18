@@ -49,8 +49,8 @@ module mod_sw_dyn
 
     real(rk), allocatable :: left_edge(:), right_edge(:) ! edge values as calculated by the PPM
 
-    integer, parameter :: PPM_UNCONSTRAINED = 0
-    integer, parameter :: PPM_CONSTRAINED = 1
+    integer(ik), parameter :: PPM_UNCONSTRAINED = 0
+    integer(ik), parameter :: PPM_CONSTRAINED = 1
         
 contains
 
@@ -86,7 +86,7 @@ contains
             ! Calculate the inner advective step for the x-direction flux
             ! of the h half-step; this uses a simple first-order upwind estimate.
             do i=is+1,ie-1
-                if (va(i,j) > 0) then
+                if (va(i,j) > 0.) then
                     intermediate(i) = h(i,j) - .5 * dt2dy * va(i,j) * (h(i,j) - h(i,j-1))
                 else
                     intermediate(i) = h(i,j) - .5 * dt2dy * va(i,j) * (h(i,j+1) - h(i,j))
@@ -107,7 +107,7 @@ contains
         ! Now repeat for the y-direction flux of the h half-step
         do i=is+3,ie-3
             do j=js+1,je-1
-                if (ua(i,j) > 0) then
+                if (ua(i,j) > 0.) then
                     intermediate(j) = h(i,j) - .5 * dt2dx * ua(i,j) * (h(i,j) - h(i-1,j))
                 else
                     intermediate(j) = h(i,j) - .5 * dt2dx * ua(i,j) * (h(i+1,j) - h(i,j))
@@ -140,7 +140,7 @@ contains
 
         do i=is+6,ie-6
             do j=js+4,je-4
-                if (ub(i,j) > 0) then
+                if (ub(i,j) > 0.) then
                     intermediate(j) = vorticity(i,j) &
                         - .5 * dt2dx * ub(i,j) * (vorticity(i,j) - vorticity(i-1,j))
                 else
@@ -160,7 +160,7 @@ contains
 
         do j=js+6,je-6
             do i=is+4,ie-4
-                if (vb(i,j) > 0) then
+                if (vb(i,j) > 0.) then
                     intermediate(i) = vorticity(i,j) &
                         - .5 * dt2dy * vb(i,j) * (vorticity(i,j) - vorticity(i,j-1))
                 else
@@ -193,7 +193,7 @@ contains
         
         do j=js+9,je-9
             do i=is+7,ie-7
-                if (va(i,j) > 0) then
+                if (va(i,j) > 0.) then
                     intermediate(i) = h(i,j) - dt2dy * va(i,j) * (h(i,j) - h(i,j-1))
                 else
                     intermediate(i) = h(i,j) - dt2dy * va(i,j) * (h(i,j+1) - h(i,j))
@@ -211,7 +211,7 @@ contains
 
         do i=is+9,ie-9
             do j=js+7,je-7
-                if (ua(i,j) > 0) then
+                if (ua(i,j) > 0.) then
                     intermediate(j) = h(i,j) - dt2dx * ua(i,j) * (h(i,j) - h(i-1,j))
                 else
                     intermediate(j) = h(i,j) - dt2dx * ua(i,j) * (h(i+1,j) - h(i,j))
@@ -248,7 +248,7 @@ contains
 
         do i=is+11,ie-11
             do j=js+8,je-8
-                if (ua(i,j) > 0) then
+                if (ua(i,j) > 0.) then
                     intermediate(j) = vorticity(i,j) &
                         - dt2dx * ua(i,j) * (vorticity(i,j) - vorticity(i-1,j))
                 else
@@ -268,7 +268,7 @@ contains
 
         do j=js+11,je-11
             do i=is+8,ie-8
-                if (va(i,j) > 0) then
+                if (va(i,j) > 0.) then
                     intermediate(i) = vorticity(i,j) &
                         - dt2dy * va(i,j) * (vorticity(i,j) - vorticity(i,j-1))
                 else
@@ -291,7 +291,7 @@ contains
     subroutine ppm(q, isl, iel, variant)
         real(rk), intent(in) :: q(isl:iel)
         integer(ik), intent(in) :: isl, iel
-        integer :: variant
+        integer(ik), intent(in) :: variant
         real(rk) :: dqi, dqi_min, dqi_max
         real(rk) :: dqi_mono(min(is,js):max(ie,je))
         integer(ik) :: i
@@ -299,7 +299,7 @@ contains
         if (variant == PPM_UNCONSTRAINED .or. variant == PPM_CONSTRAINED) then
 
             do i = isl+1, iel-1
-                dqi = (q(i+1) - q(i-1)) / 4
+                dqi = (q(i+1) - q(i-1)) / 4.
                 dqi_max = max(q(i+1), q(i), q(i-1)) - q(i)
                 dqi_min = q(i) - min(q(i+1), q(i), q(i-1))
                 dqi_mono(i) = sign(min(abs(dqi_min), dqi_min, dqi_max), dqi)
@@ -315,11 +315,11 @@ contains
                 if (variant == PPM_CONSTRAINED) then
                     if (i > isl+1) &
                         left_edge(i) = q(i) - sign( &
-                            min(2*abs(dqi_mono(i)), abs(left_edge(i) - q(i))), dqi_mono(i))
+                            min(2.*abs(dqi_mono(i)), abs(left_edge(i) - q(i))), dqi_mono(i))
 
                     if (i < iel-1) &
                         right_edge(i) = q(i) + sign( &
-                            min(2*abs(dqi_mono(i)), abs(right_edge(i) - q(i))), dqi_mono(i))
+                            min(2.*abs(dqi_mono(i)), abs(right_edge(i) - q(i))), dqi_mono(i))
                 end if
             end do
 

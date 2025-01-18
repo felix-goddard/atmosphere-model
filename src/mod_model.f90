@@ -50,7 +50,7 @@ contains
         end if
 
         ! Write the initial state
-        call write_output(0.)
+        call write_output(real(0., kind=rk))
 
         time_loop: do n = 1, config % nt
   

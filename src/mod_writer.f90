@@ -19,7 +19,7 @@ contains
 
     subroutine write_output(time)
         real(rk), intent(in) :: time
-        integer :: i, j
+        integer(ik) :: i, j
 
         if (this_image() == 1) call advance_time(time)
 

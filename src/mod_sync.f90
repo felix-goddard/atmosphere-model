@@ -48,7 +48,7 @@ contains
     subroutine copy_to_buffer(q, idx)
         real(rk), intent(in) :: q(is:ie,js:je)
         integer(ik), intent(in) :: idx
-        integer :: i
+        integer(ik) :: i
 
         do i = 0, halo_width-1
             edge_buffer(jsd:jed, i+1, 1, idx)[neighbours(1)] = q(isd+i, jsd:jed) ! left neighbour
@@ -67,7 +67,7 @@ contains
     subroutine copy_from_buffer(q, idx)
         real(rk), intent(inout) :: q(is:ie,js:je)
         integer(ik), intent(in) :: idx
-        integer :: i
+        integer(ik) :: i
         
         do i = 1, halo_width
             q(isd-i, jsd:jed) = edge_buffer(jsd:jed, i, 2, idx) ! left neighbour

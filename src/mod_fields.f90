@@ -18,9 +18,9 @@ module mod_fields
 contains
 
     subroutine init_prognostic_fields()
-        integer :: i, j
+        integer(ik) :: i, j
         real(rk), parameter :: height = 10
-        real(rk), parameter :: ic = .5, jc = .5
+        real(rk), parameter :: ic = .25, jc = .25
         real(rk), parameter :: decay = 500
 
         if (.not. allocated(h))  allocate(h (is:ie, js:je))
