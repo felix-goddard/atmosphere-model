@@ -6,8 +6,10 @@ from matplotlib.animation import FuncAnimation
 
 data = xr.open_dataset('output/output.nc')
 
-hmean = 10e3 # data.h.mean().values
-hrange = 5 # (data.h.max() - data.h.min()).values / 2
+gravity = 9.807 # make sure this matches the config
+
+hmean = data.h.mean().values
+hrange = (data.h.max() - data.h.min()).values / 2
 
 norm = mpl.colors.CenteredNorm(vcenter=hmean, halfrange=hrange)
 cmap = 'bwr'
@@ -31,11 +33,17 @@ def update(t):
 ani = FuncAnimation(fig, update, frames=data.t.values, init_func=init, interval=20)
 plt.show()
 
-plt.pcolormesh(data.x, data.y, data.u.isel(t=10))
-plt.show()
+mass = data.h.sum(['x', 'y'])
+x_momentum = (data.h * data.u).sum(['x', 'y'])
+y_momentum = (data.h * data.v).sum(['x', 'y'])
+energy = .5 * (gravity * data.h**2 + data.h * (data.u**2 + data.v**2)).sum(['x', 'y'])
 
-# mass = data.h.sum(['x', 'y'])
-# plt.plot(data.t / 3600, mass / mass[0] - 1)
-# plt.xlim(data.t.min() / 3600, data.t.max() / 3600)
-# plt.xlabel(r'$t$ (h)')
-# plt.show()
+time = data.t / 3600
+fig, axs = plt.subplots(3, 1, sharex=True)
+axs[0].plot(time, mass - mass.isel(t=0))
+axs[1].plot(time, x_momentum - x_momentum.isel(t=0))
+axs[1].plot(time, y_momentum - y_momentum.isel(t=0))
+axs[2].plot(time, energy - energy.isel(t=0))
+axs[2].set_xlim(time.min(), time.max())
+axs[2].set_xlabel(r'$t$ (h)')
+plt.show()
