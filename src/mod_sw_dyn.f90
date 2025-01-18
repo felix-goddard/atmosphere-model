@@ -72,11 +72,11 @@ contains
             ub(i,j) = .5 * (ud(i,j) + ud(i-1,j))
             vb(i,j) = .5 * (vd(i,j) + vd(i,j-1))
 
-            uc(i,j) = .5 * (ub(i,j) + ub(i,j+1))
-            vc(i,j) = .5 * (vb(i,j) + vb(i+1,j))
+            uc(i,j) = .5 * (ub(i,j) + .5 * (ud(i,j+1) + ud(i-1,j+1)))
+            vc(i,j) = .5 * (vb(i,j) + .5 * (vd(i+1,j) + vd(i+1,j-1)))
 
-            ua(i,j) = .5 * (uc(i,j) + uc(i+1,j))
-            va(i,j) = .5 * (vc(i,j) + vc(i,j+1))
+            ua(i,j) = .5 * (uc(i,j) + .25 * (ud(i+1,j) + ud(i,j) + ud(i+1,j+1) + ud(i,j+1)))
+            va(i,j) = .5 * (vc(i,j) + .25 * (vd(i,j+1) + vd(i,j) + vd(i+1,j+1) + vd(i+1,j)))
         end do
 
         ! ===========================================================================
