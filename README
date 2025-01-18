@@ -1,0 +1,19 @@
+# Tsunami
+
+This codebase implements a parallelised Fortran model of the shallow water equations. It is built off the code provided as companion to [Modern Fortran: Building Efficient Parallel Applications](https://github.com/modern-fortran/tsunami) which I have extended and refactored in various ways.
+
+The eventual plan is to produce a 3D geophysical fluid simulation -- but we're a long way away from that still!
+
+# Building
+
+The code has OpenCoarrays and netCDF-Fortran as dependencies, which on my machine were installed via Homebrew so the Makefile reflects that. If your setup is different you will need to edit the Makefile so the linker can find those libraries.
+
+Otherwise, the code can be built simply by running
+```bash
+make
+```
+from the base directory of the file tree. The resulting binary, `tsunami`, can then be run with
+```bash
+cafrun -n [cores] ./tsunami
+```
+where `[cores]` should be replaced with the number of cores to run the script on in parallel, e.g. `1` for serial execution.
