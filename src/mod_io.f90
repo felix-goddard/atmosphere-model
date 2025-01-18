@@ -116,8 +116,8 @@ module mod_io
       case ('v')
         varid = varid_v
       case default
-        write (stderr, *) ('Unknown output variable ' // fieldname)
-        stop "Stopped"
+        write (log_str, '(a)') 'Unknown output variable ' // fieldname
+        call logger % fatal('write_time_slice', log_str)
       end select
 
       status = nf90_put_var(                          &
