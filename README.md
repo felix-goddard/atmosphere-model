@@ -13,7 +13,7 @@ Otherwise, the code can be built simply by running
 make
 ```
 from the base directory of the file tree. The resulting binary, `model`, can then be run with
-```bash
-cafrun -n [cores] ./model
+```shell
+$ cafrun -n [cores] ./model
 ```
 where `[cores]` should be replaced with the number of cores to run the script on in parallel, e.g. `1` for serial execution.
