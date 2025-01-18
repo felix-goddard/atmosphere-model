@@ -6,23 +6,28 @@ from matplotlib.animation import FuncAnimation
 
 data = xr.open_dataset('output/output.nc')
 
-gravity = 9.807 # make sure this matches the config
+# make sure these values match the config
+Lx = Ly = 1500e3
+gravity = 9.807
 
 hmean = data.h.mean().values
 hrange = (data.h.max() - data.h.min()).values / 2
+
+xs = data.x / (Lx / 2)
+ys = data.y / (Ly / 2)
 
 norm = mpl.colors.CenteredNorm(vcenter=hmean, halfrange=hrange)
 cmap = 'bwr'
 
 fig, ax = plt.subplots()
 ax.set_aspect('equal')
-mesh = ax.pcolormesh(data.x, data.y, data.h[0,:,:], norm=norm, cmap=cmap)
+mesh = ax.pcolormesh(xs, ys, data.h[0,:,:], norm=norm, cmap=cmap)
 plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 
 def init():
     ax.set_title(f'time$=0$')
-    ax.set_xlim(data.x.min(), data.x.max())
-    ax.set_ylim(data.y.min(), data.y.max())
+    ax.set_xlim(xs.min(), xs.max())
+    ax.set_ylim(ys.min(), ys.max())
     return mesh,
 
 def update(t):

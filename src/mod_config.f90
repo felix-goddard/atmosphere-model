@@ -47,8 +47,8 @@ module mod_config
 
       close(fileunit)
 
-      dx = Lx / (nx - 1)
-      dy = Ly / (ny - 1)
+      dx = Lx / nx
+      dy = Ly / ny
 
       main_config = Config(nx, ny, nt, dx, dy, dt, Lx, Ly, g, f)
     end subroutine init_config

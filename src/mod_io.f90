@@ -24,12 +24,14 @@ module mod_io
     subroutine init_io()
       integer(ik) :: i, status
       integer(ik) :: xsize, ysize
-      real(rk) :: dx, dy
+      real(rk) :: dx, dy, Lx, Ly
 
       xsize = config % nx
       ysize = config % ny
       dx = config % dx
+      Lx = config % Lx
       dy = config % dy
+      Ly = config % Ly
       time_index = 0 ! since we call advance_time before ever writing, start it at 0
 
       status = nf90_create(path='output/output.nc', cmode=nf90_clobber, ncid=ncid)
@@ -65,10 +67,10 @@ module mod_io
       status = nf90_enddef(ncid)
       call handle_netcdf_error(status, 'init_io')
 
-      status = nf90_put_var(ncid, varid_x, [(i*dx, i = 0, xsize-1)])
+      status = nf90_put_var(ncid, varid_x, [((dx-Lx)/2. + i*dx, i = 0, xsize-1)])
       call handle_netcdf_error(status, 'init_io')
 
-      status = nf90_put_var(ncid, varid_y, [(i*dy, i = 0, ysize-1)])
+      status = nf90_put_var(ncid, varid_y, [((dy-Ly)/2. + i*dy, i = 0, ysize-1)])
       call handle_netcdf_error(status, 'init_io')
 
     end subroutine init_io

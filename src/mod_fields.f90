@@ -52,7 +52,8 @@ contains
         h(:,:) = 0.
         do concurrent (i=isd:ied, j=jsd:jed)
             h(i,j) = 10000. + height * exp( &
-                -decay * ((real(i)/config % nx - ic)**2 + (real(j)/config % ny - jc)**2))
+                -decay * ( (real(i-1)/(config%nx-1) - ic)**2 &
+                         + (real(j-1)/(config%ny-1) - jc)**2))
         end do
 
         ud(:,:) = 0.
