@@ -55,6 +55,10 @@ module mod_sw_dyn
 contains
 
     subroutine sw_dynamics_step(dt)
+        ! Solve the shallow water equations following the method of Lin & Rood (1997)
+        ! (i.e. on the CD grid using the finite-volume multidimensional transport scheme
+        ! of Lin & Rood (1996)).
+
         real(rk), intent(in) :: dt
         integer(ik) :: i, j
         real(rk) :: dx, dy, dtdx, dtdy, dt2, dt2dx, dt2dy
@@ -121,7 +125,7 @@ contains
             end do
         end do
 
-        ! At this point, ch is valid on is+3 to ie-3 (and same for js/je)
+        ! At this point, hc is valid on is+3 to ie-3 (and same for js/je)
         !                uc/vc are valid on is+1 to ie-1 (and same for js/je)
 
         ! ===========================================================================
@@ -289,6 +293,15 @@ contains
     end subroutine sw_dynamics_step
 
     subroutine ppm(q, isl, iel, variant)
+        ! Calculate the left and right cell edge values given the cell averages q(isl:iel)
+        ! by a piecewise parabolic reconstruction.
+        ! The `variant` argument selects between different reconstruction algorithms,
+        ! currently the options are:
+        !  - PPM_UNCONSTRAINED: implements then simplified method of Lin (2004) without
+        !                       any constraints on the edge values.
+        !  - PPM_CONSTRAINED: also implements the simplified method of Lin (2004) with
+        !                     the addition of a monotonicity constraint.
+
         real(rk), intent(in) :: q(isl:iel)
         integer(ik), intent(in) :: isl, iel
         integer(ik), intent(in) :: variant
