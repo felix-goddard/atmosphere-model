@@ -1,5 +1,5 @@
 fc := caf
-fcflags := -O3 -I/opt/homebrew/include -fbackslash -g -fbounds-check
+fcflags := -O3 -I/opt/homebrew/include -fimplicit-none -fbackslash -g -fbounds-check
 fclibs := -L/opt/homebrew/lib/ -L/opt/homebrew/include -lnetcdff
 rm := rm -f
 
@@ -25,7 +25,7 @@ $(objdir)/%.o: $(srcdir)/%.f90
 
 $(objects): $(objdir)/mod_kinds.o
 $(objdir)/mod_io.o: $(srcdir)/mod_io.f90 $(objdir)/mod_log.o
-$(objdir)/mod_config.o: $(srcdir)/mod_config.f90 $(objdir)/mod_log.o
+$(objdir)/mod_config.o: $(srcdir)/mod_config.f90 $(objdir)/mod_log.o $(objdir)/mod_util.o
 $(objdir)/mod_sync.o: $(srcdir)/mod_sync.f90 $(objdir)/mod_fields.o
 $(objdir)/mod_sw_dyn.o: $(srcdir)/mod_sw_dyn.f90 $(objdir)/mod_fields.o
 $(objdir)/mod_model.o: $(srcdir)/mod_model.f90 $(objdir)/mod_sw_dyn.o $(objdir)/mod_sync.o $(objdir)/mod_log.o $(objdir)/mod_writer.o $(objdir)/mod_timing.o

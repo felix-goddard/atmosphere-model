@@ -1,10 +1,13 @@
 &domain
     nx = 200
     ny = 200
-    nt = 1440
-    dt = 15
     Lx = 1500000
     Ly = 1500000
+/
+
+&time_control
+    dt_max = 20
+    run_duration = "PT12H"
 /
 
 &phys_param
