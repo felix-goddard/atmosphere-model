@@ -117,7 +117,7 @@ contains
             call ppm(intermediate(js+1:je-1), js+1, je-1, variant=PPM_UNCONSTRAINED)
             
             do j=js+3,je-3
-                hc(i,j) = hc(i,j) - dt2dy * (vc(i,j+1) * right_edge(i) - vc(i,j) * left_edge(i))
+                hc(i,j) = hc(i,j) - dt2dy * (vc(i,j+1) * right_edge(j) - vc(i,j) * left_edge(j))
             end do
         end do
 
