@@ -20,8 +20,9 @@ contains
         call init_prognostic_fields()
         call allocate_sw_dyn_arrays()
         call init_halo_sync()
-        call halo_exchange()
         call allocate_writer()
+
+        call halo_exchange()
 
     end subroutine init_model
 
@@ -44,6 +45,9 @@ contains
                 ' h; will perform ', config % nt, ' steps'
             call logger % info('run_model', log_str)
         end if
+
+        ! Write the initial state
+        call write_output(0.)
 
         time_loop: do n = 1, config % nt
   

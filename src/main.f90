@@ -1,7 +1,7 @@
 program main
   
     use mod_io, only: init_io, finalise_io
-    use mod_log, only: init_logging, logger => main_logger, log_str, log_error
+    use mod_log, only: init_logging, logger => main_logger, log_error
     use mod_config, only: init_config
     use mod_model, only: init_model, run_model
   
