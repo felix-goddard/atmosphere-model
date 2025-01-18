@@ -13,6 +13,7 @@ module mod_writer
 
     real(rk), allocatable :: output_field(:,:)
     real(rk), allocatable :: gather_coarray(:,:)[:]
+    real(rk), allocatable :: gather(:,:)
     
 contains
 
@@ -43,17 +44,25 @@ contains
         character(len=*), intent(in) :: name
         real(rk), intent(in) :: time
 
+        sync all
         gather_coarray(isd:ied, jsd:jed)[1] = field(:,:)
         sync all
+
         if (this_image() == 1) then
-            call write_time_slice(gather_coarray(:,:), name)
+            gather(:,:) = gather_coarray(:,:)
+            call write_time_slice(gather, name)
         end if
     end subroutine write
 
     subroutine allocate_writer()
     
-        if (.not. allocated(output_field))   allocate(output_field(isd:ied, jsd:jed))
-        if (.not. allocated(gather_coarray)) allocate(gather_coarray(config % nx, config % ny)[*])
+        if (.not. allocated(output_field)) allocate(output_field(isd:ied, jsd:jed))
+
+        if (.not. allocated(gather_coarray)) &
+            allocate(gather_coarray(1:config % nx, 1:config % ny)[*])
+
+        if (this_image() == 1 .and. .not. allocated(gather)) &
+            allocate(gather(1:config % nx, 1:config % ny))
         
     end subroutine allocate_writer
     

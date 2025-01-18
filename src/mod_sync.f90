@@ -90,9 +90,9 @@ contains
     subroutine init_halo_sync()
     
         if (.not. allocated(edge_buffer)) &
-            allocate(edge_buffer(                             &
-                1:max(config % nx, config % ny)+2*halo_width, &
-                halo_width, 4, n_prognostics)[*]              )
+            allocate(edge_buffer(                &
+                1:max(config % nx, config % ny), &
+                halo_width, 4, n_prognostics)[*] )
     
         if (.not. allocated(corner_buffer)) &
             allocate(corner_buffer(halo_width, halo_width, 4, n_prognostics)[*])
