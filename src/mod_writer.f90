@@ -9,34 +9,61 @@ module mod_writer
     implicit none
 
     private
-    public :: write_output, allocate_writer
+    public :: allocate_writer, accumulate_output, write_output
 
-    real(rk), allocatable :: output_field(:,:)
+    integer(ik), parameter :: n_output_fields = 3 ! number of outputs
+
+    real(rk), allocatable :: output_field(:,:,:)
+    real(rk)              :: accumulation_time
     real(rk), allocatable :: gather_coarray(:,:)[:]
     real(rk), allocatable :: gather(:,:)
+
+    ! these indices into `output_field` determine which variable we are
+    ! accumulating or outputting; make sure these are unique
+    integer(ik), parameter :: H_IDX = 1
+    integer(ik), parameter :: U_IDX = 2
+    integer(ik), parameter :: V_IDX = 3
     
 contains
 
-    subroutine write_output(time)
-        real(rk), intent(in) :: time
-        integer(ik) :: i, j
+    subroutine accumulate_output(dt)
+        real(rk), intent(in) :: dt
+        integer :: i, j
 
-        if (this_image() == 1) call advance_time(time)
+        output_field(:,:,H_IDX) = output_field(:,:,H_IDX) &
+            + dt * h(isd:ied, jsd:jed)
+
+        do concurrent (i=isd:ied, j=jsd:jed)
+            output_field(i,j,U_IDX) = output_field(i,j,U_IDX) &
+                + dt * .5 * (ud(i,j) + ud(i,j+1))
+
+            output_field(i,j,V_IDX) = output_field(i,j,V_IDX) &
+                + dt * .5 * (vd(i,j) + vd(i+1,j))
+        end do
+        
+        accumulation_time = accumulation_time + dt
+
+    end subroutine accumulate_output
+
+    subroutine write_output(previous_time, time)
+        real(rk), intent(in) :: previous_time, time
+        integer :: i, j, k
+
+        if (this_image() == 1) call advance_time(.5 * (previous_time + time))
+
+        output_field(:,:,:) = output_field(:,:,:) / accumulation_time
 
         ! Output height field
-        call write(h(isd:ied, jsd:jed), 'h', time)
+        call write(output_field(:,:,H_IDX), 'h', time)
 
         ! Output u wind
-        do concurrent (i=isd:ied, j=jsd:jed)
-            output_field(i,j) = .5 * (ud(i,j) + ud(i,j+1))
-        end do
-        call write(output_field, 'u', time)
+        call write(output_field(:,:,U_IDX), 'u', time)
 
         ! Output v wind
-        do concurrent (i=isd:ied, j=jsd:jed)
-            output_field(i,j) = .5 * (vd(i,j) + vd(i+1,j))
-        end do
-        call write(output_field, 'v', time)
+        call write(output_field(:,:,V_IDX), 'v', time)
+
+        output_field(:,:,:) = 0.
+        accumulation_time = 0.
 
     end subroutine write_output
 
@@ -57,7 +84,10 @@ contains
 
     subroutine allocate_writer()
     
-        if (.not. allocated(output_field)) allocate(output_field(isd:ied, jsd:jed))
+        if (.not. allocated(output_field)) &
+            allocate(output_field(isd:ied, jsd:jed, n_output_fields))
+
+        accumulation_time = 0.
 
         if (.not. allocated(gather_coarray)) &
             allocate(gather_coarray(1:config % nx, 1:config % ny)[*])

@@ -11,9 +11,10 @@ module mod_config
   
     type :: Config
       integer(ik) :: nx, ny
-      real(rk) :: t_final, dt_max
-      real(rk) :: dx, dy
       real(rk) :: Lx, Ly
+      real(rk) :: dx, dy
+      real(rk) :: t_final, dt_max
+      real(rk) :: dt_output
       real(rk) :: gravity, coriolis
     end type Config
 
@@ -27,13 +28,13 @@ module mod_config
 
       type(Config) :: conf
       integer(ik) :: nx, ny
-      character(len=99) :: run_duration
-      real(rk) :: dx, dy, dt_max, t_final
+      character(len=99) :: max_timestep, run_duration, output_interval
+      real(rk) :: dx, dy, t_final, dt_max, dt_output
       real(rk) :: Lx, Ly
       real(rk) :: g, f
 
       namelist /domain/ nx, ny, Lx, Ly
-      namelist /time_control/ run_duration, dt_max
+      namelist /time_control/ run_duration, output_interval, max_timestep
       namelist /phys_param/ g, f
 
       open(newunit=fileunit, file=filename, status='old', action='read')
@@ -60,9 +61,12 @@ module mod_config
 
       dx = Lx / nx
       dy = Ly / ny
-      t_final = parse_duration(trim(run_duration))
 
-      main_config = Config(nx, ny, t_final, dt_max, dx, dy, Lx, Ly, g, f)
+      t_final = parse_duration(trim(run_duration))
+      dt_max = parse_duration(trim(max_timestep))
+      dt_output = parse_duration(trim(output_interval))
+
+      main_config = Config(nx, ny, Lx, Ly, dx, dy, t_final, dt_max, dt_output, g, f)
     end subroutine init_config
   
   end module mod_config

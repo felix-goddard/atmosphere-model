@@ -8,12 +8,15 @@ module mod_model
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
     use mod_sync, only: halo_exchange, allocate_sync_buffers
-    use mod_writer, only: write_output, allocate_writer
+    use mod_writer, only: allocate_writer, accumulate_output, write_output
 
     implicit none
 
     private
     public :: init_model, run_model
+
+    real(rk) :: previous_write_time
+    logical :: write_this_step
 
 contains
     
@@ -29,10 +32,13 @@ contains
         call halo_exchange()
         call timing_off('HALO')
 
+        previous_write_time = 0.
+        write_this_step = .false.
+
     end subroutine init_model
 
     subroutine run_model()
-        integer(ik) :: n
+        integer(ik) :: n = 0
         real(rk) :: time, dt
 
         if (this_image() == 1) then
@@ -51,11 +57,12 @@ contains
         end if
 
         ! Write the initial state
-        call write_output(real(0., kind=rk))
+        call accumulate_output(1._rk)
+        call write_output(0._rk, 0._rk)
 
-        ! time_loop: do n = 1, config % nt
         do while (time < config % t_final)
 
+            n = n + 1
             dt = calculate_dt(time)
   
             if (this_image() == 1) then
@@ -73,9 +80,18 @@ contains
 
             time = time + dt
 
-            call timing_on('OUTPUT')
-            call write_output(time)
-            call timing_off('OUTPUT')
+            call timing_on('ACCUMULATE_OUTPUT')
+            call accumulate_output(dt)
+            call timing_off('ACCUMULATE_OUTPUT')
+
+            if (write_this_step) then
+                call timing_on('WRITE_OUTPUT')
+                call write_output(previous_write_time, time)
+                call timing_off('WRITE_OUTPUT')
+
+                previous_write_time = time
+                write_this_step = .false.
+            end if
         
         end do
 
@@ -84,8 +100,14 @@ contains
     function calculate_dt(time) result(dt)
         real(rk), intent(in) :: time
         real(rk) :: dt
-    
+
         dt = min(config % dt_max, config % t_final - time)
+
+        if (previous_write_time + config % dt_output <= config % t_final &
+            .and. time + dt >= previous_write_time + config % dt_output) then
+                dt = previous_write_time + config % dt_output - time
+                write_this_step = .true.
+        end if
         
     end function calculate_dt
 

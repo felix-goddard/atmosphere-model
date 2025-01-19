@@ -6,8 +6,9 @@
 /
 
 &time_control
-    dt_max = 20
+    max_timestep = "PT20S"
     run_duration = "PT12H"
+    output_interval = "PT1M"
 /
 
 &phys_param
