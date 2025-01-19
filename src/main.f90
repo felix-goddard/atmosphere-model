@@ -1,7 +1,7 @@
 program main
   
     use mod_io, only: init_io, finalise_io
-    use mod_log, only: init_logging, logger => main_logger, log_error
+    use mod_log, only: init_logging, logger => main_logger, log_error, log_warning
     use mod_timing, only: init_timing, print_timing
     use mod_config, only: init_config
     use mod_model, only: init_model, run_model
@@ -10,7 +10,8 @@ program main
   
     if (this_image() == 1) then
       ! Initialise logging first.
-      call init_logging('log/log.out', 'log/log.err', output_level=log_error)
+      call init_logging('log/log.out', 'log/log.err', &
+        output_level=log_error, error_level=log_warning)
       call logger % info('main', 'Initialised logger')
     end if
 

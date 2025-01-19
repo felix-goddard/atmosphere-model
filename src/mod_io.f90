@@ -109,15 +109,15 @@ module mod_io
       integer(ik) :: status, varid
 
       select case (fieldname)
-      case ('h')
-        varid = varid_h
-      case ('u')
-        varid = varid_u
-      case ('v')
-        varid = varid_v
-      case default
-        write (log_str, '(a)') 'Unknown output variable ' // fieldname
-        call logger % fatal('write_time_slice', log_str)
+        case ('h')
+          varid = varid_h
+        case ('u')
+          varid = varid_u
+        case ('v')
+          varid = varid_v
+        case default
+          write (log_str, '(a)') 'Unknown output variable ' // fieldname
+          call logger % fatal('write_time_slice', log_str)
       end select
 
       status = nf90_put_var(                          &

@@ -38,7 +38,7 @@ contains
     end subroutine init_model
 
     subroutine run_model()
-        integer(ik) :: n = 0
+        integer(ik) :: n
         real(rk) :: time, dt
 
         if (this_image() == 1) then
@@ -55,6 +55,9 @@ contains
             write (log_str, '(a,f10.2,a)') 'Running to t = ', (config % t_final / 3600.), ' h'
             call logger % info('run_model', log_str)
         end if
+
+        n = 0
+        time = 0.
 
         ! Write the initial state
         call accumulate_output(1._rk)
