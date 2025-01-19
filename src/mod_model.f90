@@ -28,9 +28,9 @@ contains
         call allocate_sync_buffers()
         call allocate_writer()
 
-        call timing_on('HALO')
+        call timing_on('HALO EXCHANGE')
         call halo_exchange()
-        call timing_off('HALO')
+        call timing_off('HALO EXCHANGE')
 
         previous_write_time = 0.
         write_this_step = .false.
@@ -70,24 +70,24 @@ contains
                 call logger % info('run_model', log_str)
             end if
 
-            call timing_on('SW_DYN')
+            call timing_on('SW DYNAMICS')
             call sw_dynamics_step(dt)
-            call timing_off('SW_DYN')
+            call timing_off('SW DYNAMICS')
 
-            call timing_on('HALO')
+            call timing_on('HALO EXCHANGE')
             call halo_exchange()
-            call timing_off('HALO')
+            call timing_off('HALO EXCHANGE')
 
             time = time + dt
 
-            call timing_on('ACCUMULATE_OUTPUT')
+            call timing_on('ACCUMULATE OUTPUT')
             call accumulate_output(dt)
-            call timing_off('ACCUMULATE_OUTPUT')
+            call timing_off('ACCUMULATE OUTPUT')
 
             if (write_this_step) then
-                call timing_on('WRITE_OUTPUT')
+                call timing_on('WRITE OUTPUT')
                 call write_output(previous_write_time, time)
-                call timing_off('WRITE_OUTPUT')
+                call timing_off('WRITE OUTPUT')
 
                 previous_write_time = time
                 write_this_step = .false.
