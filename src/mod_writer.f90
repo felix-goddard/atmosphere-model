@@ -42,7 +42,6 @@ contains
     subroutine accumulate_output(dt)
         real(rk), intent(in) :: dt
         integer(ik) :: i, j
-        real(rk) :: val
 
         do i = isd, ied
             do j = jsd, jed
@@ -63,30 +62,28 @@ contains
 
     subroutine write_output(previous_time, time)
         real(rk), intent(in) :: previous_time, time
-        integer :: i, j, k
 
         if (this_image() == 1) call advance_time(.5 * (previous_time + time))
 
         output_field(:,:,:) = output_field(:,:,:) / accumulation_time
 
         ! Output height field
-        call write(output_field(:,:,H_IDX), 'h', time)
+        call write(output_field(:,:,H_IDX), 'h')
 
         ! Output u wind
-        call write(output_field(:,:,U_IDX), 'u', time)
+        call write(output_field(:,:,U_IDX), 'u')
 
         ! Output v wind
-        call write(output_field(:,:,V_IDX), 'v', time)
+        call write(output_field(:,:,V_IDX), 'v')
 
         output_field(:,:,:) = 0.
         accumulation_time = 0.
 
     end subroutine write_output
 
-    subroutine write(field, name, time)
+    subroutine write(field, name)
         real(rk), intent(in) :: field(isd:ied, jsd:jed)
         character(len=*), intent(in) :: name
-        real(rk), intent(in) :: time
 
         sync all
         gather_coarray(isd:ied, jsd:jed)[1] = field(:,:)

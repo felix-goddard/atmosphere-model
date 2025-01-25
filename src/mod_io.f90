@@ -4,7 +4,7 @@ module mod_io
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
-    use mod_util, only: abort
+    use mod_util, only: abort_now
     use netcdf, only: &
       nf90_create, nf90_def_dim, nf90_def_var, nf90_float, nf90_put_var,    &
       nf90_enddef, nf90_close, nf90_unlimited, nf90_clobber, nf90_strerror, &
@@ -89,7 +89,7 @@ module mod_io
       if (errcode /= nf90_noerr) then
         write (log_str, *) trim(nf90_strerror(errcode))
         call logger % fatal(source, log_str)
-        call abort()
+        call abort_now()
       end if
     end subroutine handle_netcdf_error
 
@@ -120,7 +120,7 @@ module mod_io
         case default
           write (log_str, '(a)') 'Unknown output variable ' // fieldname
           call logger % fatal('write_time_slice', log_str)
-          call abort()
+          call abort_now()
       end select
 
       status = nf90_put_var(                          &

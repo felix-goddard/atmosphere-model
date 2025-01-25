@@ -38,8 +38,7 @@ module mod_tiles
       integer(ik), intent(in) :: n
       integer(ik) :: num_tiles(2)
       integer(ik), allocatable :: divs(:)
-      integer(ik) :: dim1, dim2
-      integer(ik) :: i, j
+      integer(ik) :: dim1, dim2, i
   
       divs = divisors(n)
 
@@ -91,29 +90,6 @@ module mod_tiles
       indices(1:2) = tile_indices_1d(dims(1), tiles_ij(1), tiles(1))
       indices(3:4) = tile_indices_1d(dims(2), tiles_ij(2), tiles(2))
     end function tile_indices_2d
-  
-  
-    pure function tile_neighbors_1d() result(neighbors)
-      ! Returns the image indices corresponding
-      ! to left and right neighbor tiles.
-
-      integer(ik) :: neighbors(2)
-      integer(ik) :: left, right
-
-      if (num_images() > 1) then
-        left = this_image() - 1
-        right = this_image() + 1
-        if (this_image() == 1) then
-          left = num_images()
-        else if (this_image() == num_images()) then
-          right = 1
-        end if
-      else
-        left = 1
-        right = 1
-      end if
-      neighbors = [left, right]
-    end function tile_neighbors_1d
   
   
     pure function tile_n2ij(n) result(ij)
@@ -243,7 +219,6 @@ module mod_tiles
 
     subroutine init_tiles()
       integer(ik) :: indices(4), upper(2), lower(2)
-      integer(ik) :: i, j
 
       indices = tile_indices([config % nx, config % ny])
       lower = indices([1, 3])

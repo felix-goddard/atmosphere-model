@@ -6,7 +6,7 @@ module mod_sw_dyn
     use mod_config, only: config => main_config
     use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
     use mod_fields, only: h, ud, vd
-    use mod_util, only: abort
+    use mod_util, only: abort_now
 
     implicit none
     private
@@ -454,7 +454,7 @@ contains
         else
             write (log_str, '(a,i4)') 'Unknown PPM variant:', variant
             call logger % fatal('ppm', log_str)
-            call abort()
+            call abort_now()
         end if
         
     end subroutine ppm

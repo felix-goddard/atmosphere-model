@@ -2,7 +2,7 @@ module mod_config
 
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
-    use mod_util, only: abort, parse_duration
+    use mod_util, only: abort_now, parse_duration
   
     implicit none
   
@@ -26,7 +26,6 @@ module mod_config
       character(len=*), intent(in) :: filename
       integer(ik) :: fileunit, iostat
 
-      type(Config) :: conf
       integer(ik) :: nx, ny
       character(len=99) :: max_timestep, run_duration, output_interval
       real(rk) :: dx, dy, t_final, dt_max, dt_output
@@ -43,21 +42,21 @@ module mod_config
       if (iostat /= 0) then
         write (log_str, '(a)') 'Could not read `domain` namelist'
         call logger % fatal('init_config', log_str)
-        call abort()
+        call abort_now()
       end if
 
       read(fileunit, iostat=iostat, nml=time_control)
       if (iostat /= 0) then
         write (log_str, '(a)') 'Could not read `time_control` namelist'
         call logger % fatal('init_config', log_str)
-        call abort()
+        call abort_now()
       end if
 
       read(fileunit, iostat=iostat, nml=phys_param)
       if (iostat /= 0) then
         write (log_str, '(a)') 'Could not read `phys_param` namelist'
         call logger % fatal('init_config', log_str)
-        call abort()
+        call abort_now()
       end if
 
       close(fileunit)

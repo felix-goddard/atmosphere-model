@@ -6,17 +6,17 @@ module mod_util
     implicit none
 
     private
-    public :: abort, parse_duration
+    public :: abort_now, parse_duration
     
 contains
 
-    subroutine abort()
+    subroutine abort_now()
 
         close (unit=logger % output_unit)
         close (unit=logger % error_unit)
         stop 'Aborted'
         
-    end subroutine abort
+    end subroutine abort_now
 
     function parse_duration(duration_str) result(duration)
         ! Read an ISO8601 formatted duration string and output an equivalent
@@ -54,6 +54,8 @@ contains
         n_hour   = 0.
         n_minute = 0.
         n_second = 0.
+
+        duration = 0.
 
         i_period = scan(duration_str, 'P')
         if (i_period /= 1) goto 10
@@ -139,7 +141,7 @@ contains
 
         10 write (log_str, '(a)') 'Could not read ISO8601 duration `' // duration_str // '`'
         call logger % fatal('parse_duration', log_str)
-        call abort()
+        call abort_now()
 
     end function parse_duration
 

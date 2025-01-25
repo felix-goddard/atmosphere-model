@@ -82,6 +82,7 @@ contains
             call timing_off('HALO EXCHANGE')
 
             stable = is_stable()
+            sync all
             call co_reduce(stable, and_func)
             if (.not. stable) then
                 write (log_str, '(a)') 'Instability detecting, aborting.'
