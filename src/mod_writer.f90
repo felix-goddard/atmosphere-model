@@ -14,6 +14,7 @@ module mod_writer
     integer(ik), parameter :: n_output_fields = 3 ! number of outputs
 
     real(rk), allocatable :: output_field(:,:,:)
+    real(rk), allocatable :: compensation(:,:,:)
     real(rk)              :: accumulation_time
     real(rk), allocatable :: gather_coarray(:,:)[:]
     real(rk), allocatable :: gather(:,:)
@@ -26,19 +27,34 @@ module mod_writer
     
 contains
 
+    subroutine compensated_sum(val, i, j, idx)
+        integer(ik), intent(in) :: i, j, idx
+        real(rk), intent(in) :: val
+        real(rk) :: y, sum, c
+
+        y = val - compensation(i,j,idx)
+        sum = output_field(i,j,idx) + y
+        c = (sum - output_field(i,j,idx)) - y
+        output_field(i,j,idx) = sum
+
+    end subroutine compensated_sum
+
     subroutine accumulate_output(dt)
         real(rk), intent(in) :: dt
-        integer :: i, j
+        integer(ik) :: i, j
+        real(rk) :: val
 
-        output_field(:,:,H_IDX) = output_field(:,:,H_IDX) &
-            + dt * h(isd:ied, jsd:jed)
+        do i = isd, ied
+            do j = jsd, jed
+                ! height
+                call compensated_sum(dt * h(i,j), i, j, H_IDX)
 
-        do concurrent (i=isd:ied, j=jsd:jed)
-            output_field(i,j,U_IDX) = output_field(i,j,U_IDX) &
-                + dt * .5 * (ud(i,j) + ud(i,j+1))
+                ! u wind
+                call compensated_sum(dt * .5 * (ud(i,j) + ud(i,j+1)), i, j, U_IDX)
 
-            output_field(i,j,V_IDX) = output_field(i,j,V_IDX) &
-                + dt * .5 * (vd(i,j) + vd(i+1,j))
+                ! v wind
+                call compensated_sum(dt * .5 * (vd(i,j) + vd(i+1,j)), i, j, V_IDX)
+            end do
         end do
         
         accumulation_time = accumulation_time + dt
@@ -86,6 +102,9 @@ contains
     
         if (.not. allocated(output_field)) &
             allocate(output_field(isd:ied, jsd:jed, n_output_fields))
+
+        if (.not. allocated(compensation)) &
+            allocate(compensation(isd:ied, jsd:jed, n_output_fields))
 
         accumulation_time = 0.
 
