@@ -1,15 +1,17 @@
 module mod_sw_dyn
 
+    use ieee_arithmetic, only: ieee_is_finite
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
     use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
     use mod_fields, only: h, ud, vd
+    use mod_util, only: abort
 
     implicit none
     private
 
-    public :: sw_dynamics_step, allocate_sw_dyn_arrays
+    public :: sw_dynamics_step, allocate_sw_dyn_arrays, is_stable
 
     real(rk), allocatable :: hc(:,:) ! height for the C grid half-step
 
@@ -54,6 +56,15 @@ module mod_sw_dyn
     integer(ik), parameter :: PPM_CONSTRAINED = 1
         
 contains
+
+    function is_stable()
+        logical :: is_stable
+
+        is_stable = (all(ieee_is_finite(h(:,:))) &
+            .and. all(ieee_is_finite(ud(:,:)))   &
+            .and. all(ieee_is_finite(vd(:,:))))
+        
+    end function is_stable
 
     subroutine sw_dynamics_step(dt)
         ! Solve the shallow water equations following the method of Lin & Rood (1997)
@@ -145,7 +156,7 @@ contains
 
         do i = is+2, ie-2
             courant(js+1:je-1) = dt2dy * va(i,js+1:je-1)
-            call ppm_flux(kinetic_energy(i,js+1:je-1), vc(i,js+1:je-1), courant(js+1:je-1), &
+            call ppm_flux(fy(js+1:je-1), vc(i,js+1:je-1), courant(js+1:je-1), &
                           js+1, je-1, variant=PPM_UNCONSTRAINED)
         end do
 
@@ -153,15 +164,14 @@ contains
             courant(is+1:ie-1) = dt2dx * ua(is+1:ie-1,j)
             call ppm_flux(fx(is+1:ie-1), uc(is+1:ie-1,j), courant(is+1:ie-1), &
                           is+1, ie-1, variant=PPM_UNCONSTRAINED)
-            kinetic_energy(is+1:ie-1,j) = .5 * ( &
-                ua(is+1:ie-1,j) * fx(is+1:ie-1) &
-                + va(is+1:ie-1,j) * kinetic_energy(is+1:ie-1,j))
         end do
 
         do concurrent (i=is+3:ie-3, j=js+3:je-3)
             vorticity(i,j) = config % coriolis &
                 - (uc(i,j) - uc(i,j-1)) / dy   &
                 + (vc(i,j) - vc(i-1,j)) / dx
+
+            kinetic_energy(i,j) = .5 * (ua(i,j) * fx(i+1) + va(i,j) * fy(j+1))
 
             energy(i,j) = kinetic_energy(i,j) + config % gravity * hc(i,j)
         end do
@@ -188,7 +198,7 @@ contains
             
             do j = js+6, je-6
                 uc(i,j) = uc(i,j)                         &
-                    + dt2 * vd(i,j) * fy(j)              &
+                    + dt2 * vd(i,j) * fy(j+1)             &
                     - dt2dx * (energy(i,j) - energy(i-1,j))
             end do
         end do
@@ -215,7 +225,7 @@ contains
             
             do i = is+6, ie-6
                 vc(i,j) = vc(i,j)                         &
-                    - dt2 * ud(i,j) * fx(i)              &
+                    - dt2 * ud(i,j) * fx(i+1)             &
                     - dt2dy * (energy(i,j) - energy(i,j-1))
             end do
         end do
@@ -264,7 +274,6 @@ contains
         ! calculate the inner step (in the x-direction) for the outer y-direction step
         do j = js+2, je-2
             courant(is+2:ie-2) = dtdx * ua(is+2:ie-2,j)
-
             call ppm_flux(fx(is+2:ie-2), h(is+2:ie-2,j), courant(is+2:ie-2), &
                           is+2, ie-2, variant=PPM_CONSTRAINED)
 
@@ -300,6 +309,7 @@ contains
             courant(is+1:ie-1) = dtdx * ub(is+1:ie-1,j)
             call ppm_flux(fx(is+1:ie-1), ud(is+1:ie-1,j), courant(is+1:ie-1), &
                           is+1, ie-1, variant=PPM_CONSTRAINED)
+
             kinetic_energy(is+1:ie-1,j) = .5 * ( &
                 ub(is+1:ie-1,j) * fx(is+1:ie-1) &
                 + vb(is+1:ie-1,j) * kinetic_energy(is+1:ie-1,j))
@@ -336,7 +346,7 @@ contains
             
             do j = js+6, je-6
                 ud(i,j) = ud(i,j)                        &
-                    + dt * vc(i,j) * fy(j)              &
+                    + dt * vc(i,j) * fy(j)               &
                     - dtdx * (energy(i+1,j) - energy(i,j))
             end do
         end do
@@ -363,7 +373,7 @@ contains
             
             do i = is+6, ie-6
                 vd(i,j) = vd(i,j)                        &
-                    - dt * uc(i,j) * fx(i)              &
+                    - dt * uc(i,j) * fx(i)               &
                     - dtdy * (energy(i,j+1) - energy(i,j))
             end do
         end do
@@ -444,6 +454,7 @@ contains
         else
             write (log_str, '(a,i4)') 'Unknown PPM variant:', variant
             call logger % fatal('ppm', log_str)
+            call abort()
         end if
         
     end subroutine ppm

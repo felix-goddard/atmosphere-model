@@ -6,7 +6,7 @@ module mod_model
     use mod_config, only: config => main_config
     use mod_tiles, only: init_tiles
     use mod_fields, only: init_prognostic_fields
-    use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step
+    use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
     use mod_sync, only: halo_exchange, allocate_sync_buffers
     use mod_writer, only: allocate_writer, accumulate_output, write_output
 
@@ -16,7 +16,7 @@ module mod_model
     public :: init_model, run_model
 
     real(rk) :: previous_write_time
-    logical :: write_this_step
+    logical :: write_this_step, stable
 
 contains
     
@@ -63,13 +63,13 @@ contains
         call accumulate_output(1._rk)
         call write_output(0._rk, 0._rk)
 
-        do while (time < config % t_final)
+        main_loop: do while (time < config % t_final)
 
             n = n + 1
             dt = calculate_dt(time)
   
             if (this_image() == 1) then
-                write (log_str, '(a,i6)') 'Computing time step', n
+                write (log_str, '(a,i6,a,f6.2)') 'Computing time step ', n, ' with dt=', dt
                 call logger % info('run_model', log_str)
             end if
 
@@ -80,6 +80,14 @@ contains
             call timing_on('HALO EXCHANGE')
             call halo_exchange()
             call timing_off('HALO EXCHANGE')
+
+            stable = is_stable()
+            call co_reduce(stable, and_func)
+            if (.not. stable) then
+                write (log_str, '(a)') 'Instability detecting, aborting.'
+                call logger % fatal('run_model', log_str)
+                exit main_loop
+            end if
 
             time = time + dt
 
@@ -96,7 +104,7 @@ contains
                 write_this_step = .false.
             end if
         
-        end do
+        end do main_loop
 
     end subroutine run_model
 
@@ -108,10 +116,17 @@ contains
 
         if (previous_write_time + config % dt_output <= config % t_final &
             .and. time + dt >= previous_write_time + config % dt_output) then
-                dt = previous_write_time + config % dt_output - time
-                write_this_step = .true.
+
+            dt = previous_write_time + config % dt_output - time
+            write_this_step = .true.
         end if
         
     end function calculate_dt
+
+    pure function and_func(a, b) result(res)
+        logical, intent(in) :: a, b
+        logical :: res
+        res = a .and. b
+    end function and_func
 
 end module mod_model

@@ -92,12 +92,6 @@ contains
                 flush (stdout)
             end if
         end if
-        
-        if (level >= log_fatal) then
-            close (unit=self % output_unit)
-            close (unit=self % error_unit)
-            stop 'Fatal error'
-        end if
     end subroutine handle_message
 
     subroutine fatal(self, source, message)
