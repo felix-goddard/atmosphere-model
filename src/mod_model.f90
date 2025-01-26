@@ -78,12 +78,12 @@ contains
             call sw_dynamics_step(dt)
             call timing_off('SW DYNAMICS')
 
+            stable = is_stable()
+
             call timing_on('HALO EXCHANGE')
             call halo_exchange()
             call timing_off('HALO EXCHANGE')
 
-            stable = is_stable()
-            sync all
             call co_reduce(stable, and_func)
             if (.not. stable) then
                 if (this_image() == 1) then

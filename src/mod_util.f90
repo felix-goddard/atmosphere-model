@@ -6,7 +6,7 @@ module mod_util
     implicit none
 
     private
-    public :: abort_now, parse_duration
+    public :: abort_now, set, parse_duration
     
 contains
 
@@ -17,6 +17,17 @@ contains
         stop 'Aborted'
         
     end subroutine abort_now
+
+    pure recursive function set(a) result(res)
+        integer, intent(in) :: a(:)
+        integer, allocatable :: res(:)
+
+        if (size(a) > 1) then
+            res = [a(1), set(pack(a(2:), .not. a(2:) == a(1)))]
+        else
+            res = a
+        end if
+    end function set
 
     function parse_duration(duration_str) result(duration)
         ! Read an ISO8601 formatted duration string and output an equivalent

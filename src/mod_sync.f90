@@ -5,6 +5,7 @@ module mod_sync
     use mod_tiles, only: neighbours, &
                          is, ie, js, je, isd, ied, jsd, jed, halo_width
     use mod_fields, only: h, ud, vd
+    use mod_util, only: set
 
     implicit none
 
@@ -33,11 +34,13 @@ contains
 
     subroutine halo_exchange()
 
+        sync images(set(neighbours))
+
         call copy_to_buffer(h,  1)
         call copy_to_buffer(ud, 2)
         call copy_to_buffer(vd, 3)
 
-        sync all
+        sync images(set(neighbours))
 
         call copy_from_buffer(h,  1)
         call copy_from_buffer(ud, 2)
