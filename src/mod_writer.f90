@@ -9,7 +9,7 @@ module mod_writer
     implicit none
 
     private
-    public :: allocate_writer, accumulate_output, write_output
+    public :: allocate_writer, accumulate_output, clear_accumulator, write_output
 
     integer(ik), parameter :: n_output_fields = 3 ! number of outputs
 
@@ -60,6 +60,14 @@ contains
 
     end subroutine accumulate_output
 
+    subroutine clear_accumulator()
+        
+        output_field(:,:,:) = 0.
+        compensation(:,:,:) = 0.
+        accumulation_time = 0.
+        
+    end subroutine clear_accumulator
+
     subroutine write_output(previous_time, time)
         real(rk), intent(in) :: previous_time, time
 
@@ -76,8 +84,7 @@ contains
         ! Output v wind
         call write(output_field(:,:,V_IDX), 'v')
 
-        output_field(:,:,:) = 0.
-        accumulation_time = 0.
+        call clear_accumulator()
 
     end subroutine write_output
 

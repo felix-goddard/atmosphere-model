@@ -8,7 +8,7 @@ module mod_model
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
     use mod_sync, only: halo_exchange, allocate_sync_buffers
-    use mod_writer, only: allocate_writer, accumulate_output, write_output
+    use mod_writer, only: allocate_writer, accumulate_output, clear_accumulator, write_output
 
     implicit none
 
@@ -34,6 +34,7 @@ contains
 
         previous_write_time = 0.
         write_this_step = .false.
+        stable = .true.
 
     end subroutine init_model
 
@@ -85,8 +86,10 @@ contains
             sync all
             call co_reduce(stable, and_func)
             if (.not. stable) then
-                write (log_str, '(a)') 'Instability detecting, aborting.'
-                call logger % fatal('run_model', log_str)
+                if (this_image() == 1) then
+                    write (log_str, '(a)') 'Instability detecting, aborting.'
+                    call logger % fatal('run_model', log_str)
+                end if
                 exit main_loop
             end if
 

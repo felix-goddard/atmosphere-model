@@ -85,25 +85,25 @@ contains
 
         if (i_year /= 0) then
             n_year = read_real(duration_str(prev+1:i_year-1))
-            if (n_year == -1) goto 10
+            if (n_year < 0) goto 10
             prev = i_year
         end if
 
         if (i_month /= 0) then
             n_month = read_real(duration_str(prev+1:i_month-1))
-            if (n_month == -1) goto 10
+            if (n_month < 0) goto 10
             prev = i_month
         end if
 
         if (i_week /= 0) then
             n_week = read_real(duration_str(prev+1:i_week-1))
-            if (n_week == -1) goto 10
+            if (n_week < 0) goto 10
             prev = i_week
         end if
 
         if (i_day /= 0) then
             n_day = read_real(duration_str(prev+1:i_day-1))
-            if (n_day == -1) goto 10
+            if (n_day < 0) goto 10
             prev = i_day
         end if
 
@@ -112,19 +112,19 @@ contains
 
             if (i_hour /= 0) then
                 n_hour = read_real(duration_str(prev+1:i_hour-1))
-                if (n_hour == -1) goto 10
+                if (n_hour < 0) goto 10
                 prev = i_hour
             end if
 
             if (i_minute /= 0) then
                 n_minute = read_real(duration_str(prev+1:i_minute-1))
-                if (n_minute == -1) goto 10
+                if (n_minute < 0) goto 10
                 prev = i_minute
             end if
 
             if (i_second /= 0) then
                 n_second = read_real(duration_str(prev+1:i_second-1))
-                if (n_second == -1) goto 10
+                if (n_second < 0) goto 10
                 prev = i_second
             end if
         end if

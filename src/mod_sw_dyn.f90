@@ -60,9 +60,9 @@ contains
     function is_stable()
         logical :: is_stable
 
-        is_stable = (all(ieee_is_finite(h(:,:))) &
-            .and. all(ieee_is_finite(ud(:,:)))   &
-            .and. all(ieee_is_finite(vd(:,:))))
+        is_stable = (all(ieee_is_finite(h(isd:ied, jsd:jed))) &
+            .and. all(ieee_is_finite(ud(isd:ied, jsd:jed)))   &
+            .and. all(ieee_is_finite(vd(isd:ied, jsd:jed))))
         
     end function is_stable
 

@@ -55,8 +55,8 @@ contains
             level_2 = log_error
         end if
         
-        open (newunit=output_unit, file=output_file)
-        open (newunit=error_unit, file=error_file)
+        open (newunit=output_unit, file=output_file, status='replace')
+        open (newunit=error_unit, file=error_file, status='replace')
 
         main_logger = Logger(level_1, level_2,      &
                              output_unit, error_unit)
