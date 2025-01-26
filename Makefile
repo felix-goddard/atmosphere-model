@@ -1,5 +1,6 @@
 fc := caf
-fcflags := -O3 -I/opt/homebrew/include -fimplicit-none -fbackslash -g -fbounds-check
+fcflags := -O3 -I/opt/homebrew/include -fimplicit-none -fbackslash -g
+debug_flags := -Dno_nans -fbacktrace -fbounds-check -fcheck=all -ffpe-trap=zero,invalid,overflow,underflow -Waliasing -Wcharacter-truncation -Wimplicit-interface -Wintrinsics-std -Wline-truncation -Wintrinsic-shadow -Wconversion -Wsurprising -Wunused -std=gnu -fmax-errors=5 -Warray-bounds -Wextra -Wall -pedantic
 fclibs := -L/opt/homebrew/lib/ -L/opt/homebrew/include -lnetcdff
 rm := rm -f
 
@@ -14,6 +15,8 @@ objects = $(sources:$(srcdir)/%.f90=$(objdir)/%.o)
 .PHONY: all clean
 
 all: $(proj_name)
+debug: fcflags += $(debug_flags)
+debug: $(proj_name)
 
 $(proj_name): $(objects)
 	$(fc) $(fcflags) $(fclibs) $(objects) -I$(objdir) -o $(proj_name)
