@@ -1,135 +1,146 @@
 module mod_io
 
-    use iso_fortran_env, only: stderr => error_unit
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
-    use mod_util, only: abort_now
-    use netcdf, only: &
-      nf90_create, nf90_def_dim, nf90_def_var, nf90_float, nf90_put_var,    &
-      nf90_enddef, nf90_close, nf90_unlimited, nf90_clobber, nf90_strerror, &
-      nf90_noerr, nf90_sync
-  
-    implicit none
-  
-    private
-    public :: init_io, finalise_io, write_time_slice, advance_time
+    use mod_netcdf, only: netcdf_file, create_netcdf
+    use mod_tiles, only: isd, ied, jsd, jed
+    use mod_fields, only: h, ud, vd
 
-    integer(ik) :: ncid
-    integer(ik) :: dimid_t, dimid_x, dimid_y
-    integer(ik) :: varid_t, varid_x, varid_y, varid_h, varid_u, varid_v
-    integer(ik) :: time_index
-  
-  contains
+    implicit none
+
+    private
+    public :: init_io, finalise_io, accumulate_output, write_output
+
+    type(netcdf_file) :: output_nc
+
+    integer(ik), parameter :: n_output_fields = 3 ! number of outputs
+
+    real(rk), allocatable :: output_field(:,:,:)
+    real(rk), allocatable :: compensation(:,:,:)
+    real(rk)              :: accumulation_time
+    real(rk), allocatable :: gather_coarray(:,:)[:]
+    real(rk), allocatable :: gather(:,:)
+
+    ! these indices into `output_field` determine which variable we are
+    ! accumulating or outputting; make sure these are unique
+    integer(ik), parameter :: H_IDX = 1
+    integer(ik), parameter :: U_IDX = 2
+    integer(ik), parameter :: V_IDX = 3
+
+contains
 
     subroutine init_io()
-      integer(ik) :: i, status
-      integer(ik) :: xsize, ysize
-      real(rk) :: dx, dy, Lx, Ly
+        integer(ik) :: i
 
-      xsize = config % nx
-      ysize = config % ny
-      dx = config % dx
-      Lx = config % Lx
-      dy = config % dy
-      Ly = config % Ly
-      time_index = 0 ! since we call advance_time before ever writing, start it at 0
+        ! Create output netCDF
 
-      status = nf90_create(path='output/output.nc', cmode=nf90_clobber, ncid=ncid)
-      call handle_netcdf_error(status, 'init_io')
+        output_nc = create_netcdf('output/output.nc')
 
-      status = nf90_def_dim(ncid, 't', nf90_unlimited, dimid_t)
-      call handle_netcdf_error(status, 'init_io')
+        call output_nc % create_time_axis()
 
-      status = nf90_def_var(ncid, 't', nf90_float, dimid_t, varid_t)
-      call handle_netcdf_error(status, 'init_io')
+        call output_nc % create_axis('x', &
+            [(-.5 * config % Lx + (i + .5) * config % dx, i = 0, config % nx - 1)])
 
-      status = nf90_def_dim(ncid, 'x', xsize, dimid_x)
-      call handle_netcdf_error(status, 'init_io')
+        call output_nc % create_axis('y', &
+            [(-.5 * config % Ly + (i + .5) * config % dy, i = 0, config % ny - 1)])
 
-      status = nf90_def_var(ncid, 'x', nf90_float, dimid_x, varid_x)
-      call handle_netcdf_error(status, 'init_io')
+        call output_nc % create_var('h', ['t', 'x', 'y'])
+        call output_nc % create_var('u', ['t', 'x', 'y'])
+        call output_nc % create_var('v', ['t', 'x', 'y'])
 
-      status = nf90_def_dim(ncid, 'y', ysize, dimid_y)
-      call handle_netcdf_error(status, 'init_io')
+        ! Allocate output arrays
 
-      status = nf90_def_var(ncid, 'y', nf90_float, dimid_y, varid_y)
-      call handle_netcdf_error(status, 'init_io')
+        if (.not. allocated(output_field)) &
+            allocate(output_field(isd:ied, jsd:jed, n_output_fields))
 
-      status = nf90_def_var(ncid, 'h', nf90_float, [dimid_x, dimid_y, dimid_t], varid_h)
-      call handle_netcdf_error(status, 'init_io')
+        if (.not. allocated(compensation)) &
+            allocate(compensation(isd:ied, jsd:jed, n_output_fields))
 
-      status = nf90_def_var(ncid, 'u', nf90_float, [dimid_x, dimid_y, dimid_t], varid_u)
-      call handle_netcdf_error(status, 'init_io')
+        accumulation_time = 0.
 
-      status = nf90_def_var(ncid, 'v', nf90_float, [dimid_x, dimid_y, dimid_t], varid_v)
-      call handle_netcdf_error(status, 'init_io')
+        if (.not. allocated(gather_coarray)) &
+            allocate(gather_coarray(1:config % nx, 1:config % ny)[*])
 
-      status = nf90_enddef(ncid)
-      call handle_netcdf_error(status, 'init_io')
-
-      status = nf90_put_var(ncid, varid_x, [((dx-Lx)/2. + i*dx, i = 0, xsize-1)])
-      call handle_netcdf_error(status, 'init_io')
-
-      status = nf90_put_var(ncid, varid_y, [((dy-Ly)/2. + i*dy, i = 0, ysize-1)])
-      call handle_netcdf_error(status, 'init_io')
-
+        if (this_image() == 1 .and. .not. allocated(gather)) &
+            allocate(gather(1:config % nx, 1:config % ny))
+        
     end subroutine init_io
 
     subroutine finalise_io()
-      integer(ik) :: status
-      status = nf90_close(ncid)
-      call handle_netcdf_error(status, 'finalise_io')
+        
+        call output_nc % close()
+
     end subroutine finalise_io
 
-    subroutine handle_netcdf_error(errcode, source)
-      integer(ik), intent(in) :: errcode
-      character(len=*), intent(in) :: source
+    subroutine accumulate_output(dt)
+        real(rk), intent(in) :: dt
+        integer(ik) :: i, j
 
-      if (errcode /= nf90_noerr) then
-        write (log_str, *) trim(nf90_strerror(errcode))
-        call logger % fatal(source, log_str)
-        call abort_now()
-      end if
-    end subroutine handle_netcdf_error
+        do i = isd, ied
+            do j = jsd, jed
+                ! height
+                call compensated_sum(dt * h(i,j), i, j, H_IDX)
 
-    subroutine advance_time(time)
-      real(rk), intent(in) :: time
-      integer(ik) :: status
+                ! u wind
+                call compensated_sum(dt * .5 * (ud(i,j) + ud(i,j+1)), i, j, U_IDX)
 
-      time_index = time_index + 1
+                ! v wind
+                call compensated_sum(dt * .5 * (vd(i,j) + vd(i+1,j)), i, j, V_IDX)
+            end do
+        end do
+        
+        accumulation_time = accumulation_time + dt
 
-      status = nf90_put_var( ncid, varid_t, time, start=[time_index] )
-      call handle_netcdf_error(status, 'advance_time')
-      
-    end subroutine advance_time
-  
-    subroutine write_time_slice(field, fieldname)
-      ! Writes a field into a binary file.
-      real(rk), intent(in) :: field(:,:)
-      character(len=*), intent(in) :: fieldname
-      integer(ik) :: status, varid
+    end subroutine accumulate_output
 
-      select case (fieldname)
-        case ('h')
-          varid = varid_h
-        case ('u')
-          varid = varid_u
-        case ('v')
-          varid = varid_v
-        case default
-          write (log_str, '(a)') 'Unknown output variable ' // fieldname
-          call logger % fatal('write_time_slice', log_str)
-          call abort_now()
-      end select
+    subroutine compensated_sum(val, i, j, idx)
+        integer(ik), intent(in) :: i, j, idx
+        real(rk), intent(in) :: val
+        real(rk) :: y, sum, c
 
-      status = nf90_put_var(                          &
-        ncid, varid, field,                           &
-        start = [ 1, 1, time_index ],                 &
-        count = [ size(field, 1), size(field, 2), 1 ] )
+        y = val - compensation(i,j,idx)
+        sum = output_field(i,j,idx) + y
+        c = (sum - output_field(i,j,idx)) - y
+        output_field(i,j,idx) = sum
 
-      call handle_netcdf_error(status, 'write_time_slice')
+    end subroutine compensated_sum
 
-    end subroutine write_time_slice
-  
-  end module mod_io
+    subroutine write_output(time)
+        real(rk), intent(in) :: time
+
+        if (this_image() == 1) call output_nc % advance_time(time)
+
+        output_field(:,:,:) = output_field(:,:,:) / accumulation_time
+
+        ! Output height field
+        call write(output_field(:,:,H_IDX), 'h')
+
+        ! Output u wind
+        call write(output_field(:,:,U_IDX), 'u')
+
+        ! Output v wind
+        call write(output_field(:,:,V_IDX), 'v')
+
+        output_field(:,:,:) = 0.
+        compensation(:,:,:) = 0.
+        accumulation_time = 0.
+
+    end subroutine write_output
+
+    subroutine write(field, name)
+        real(rk), intent(in) :: field(isd:ied, jsd:jed)
+        character(len=*), intent(in) :: name
+        integer(ik) :: varid
+
+        sync all
+        gather_coarray(isd:ied, jsd:jed)[1] = field(:,:)
+        sync all
+
+        if (this_image() == 1) then
+            gather(:,:) = gather_coarray(:,:)
+            call output_nc % put_timeslice(name, gather)
+        end if
+    end subroutine write
+
+end module mod_io

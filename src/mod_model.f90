@@ -8,7 +8,7 @@ module mod_model
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
     use mod_sync, only: halo_exchange, allocate_sync_buffers
-    use mod_writer, only: allocate_writer, accumulate_output, clear_accumulator, write_output
+    use mod_io, only: accumulate_output, write_output
 
     implicit none
 
@@ -26,7 +26,6 @@ contains
         call init_prognostic_fields()
         call allocate_sw_dyn_arrays()
         call allocate_sync_buffers()
-        call allocate_writer()
 
         call timing_on('HALO EXCHANGE')
         call halo_exchange()
@@ -62,7 +61,7 @@ contains
 
         ! Write the initial state
         call accumulate_output(1._rk)
-        call write_output(0._rk, 0._rk)
+        call write_output(0._rk)
 
         main_loop: do while (time < config % t_final)
 
@@ -101,7 +100,7 @@ contains
 
             if (write_this_step) then
                 call timing_on('WRITE OUTPUT')
-                call write_output(previous_write_time, time)
+                call write_output(.5 * (previous_write_time + time))
                 call timing_off('WRITE OUTPUT')
 
                 previous_write_time = time
