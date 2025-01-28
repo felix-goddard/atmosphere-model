@@ -132,7 +132,7 @@ contains
 
         end do main_loop
 
-        if (config % save_restart_file) then
+        if (config % save_restart_file .and. stable) then
             call write_restart_file(config % restart_filename, time)
         end if
 
