@@ -2,6 +2,7 @@ module mod_netcdf
 
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
+    use mod_config, only: config => main_config
     use mod_util, only: abort_now
     use netcdf, only:                                                                &
         nf90_open, nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable,      &
@@ -14,7 +15,7 @@ module mod_netcdf
     private
     public :: netcdf_file, open_netcdf, create_netcdf
 
-    integer(ik), parameter :: max_var_name_length = 10
+    integer(ik), parameter :: max_name_length = 10
 
     type :: netcdf_axis
         character(len=:), allocatable :: name
@@ -24,7 +25,7 @@ module mod_netcdf
     type :: netcdf_var
         character(len=:), allocatable :: name
         integer(ik) :: varid
-        integer(ik), allocatable :: dimids(:)
+        character(len=max_name_length), allocatable :: dims(:)
     end type
 
     type :: netcdf_file
@@ -47,10 +48,11 @@ contains
         type(netcdf_file) :: out
         type(netcdf_axis), allocatable :: axes(:)
         type(netcdf_var), allocatable :: vars(:)
-        character(len=max_var_name_length) :: name
+        character(len=max_name_length) :: name
         integer(ik) :: status, i, j, length
         integer(ik) :: ncid, varid, ndims, nvars, tdim
         integer(ik), allocatable :: dimids(:)
+        character(len=max_name_length), allocatable :: dimnames(:)
 
         status = nf90_open(trim(filename), nf90_nowrite, ncid)
         call handle_netcdf_error(status, 'open_netcdf')
@@ -95,11 +97,20 @@ contains
             end do
 
             allocate(dimids(1:ndims))
+
             status = nf90_inquire_variable(ncid, i, dimids=dimids)
             call handle_netcdf_error(status, 'open_netcdf')
 
-            vars = [vars, netcdf_var(name, i, dimids)]
+            allocate(dimnames(1:ndims))
+            do j = 1, ndims
+                status = nf90_inquire_dimension(ncid, dimids(j), name=dimnames(j))
+                call handle_netcdf_error(status, 'open_netcdf')
+            end do
+
+            vars = [vars, netcdf_var(name, i, dimnames)]
+
             deallocate(dimids)
+            deallocate(dimnames)
         end do var_loop
 
         out % axes = axes
@@ -110,7 +121,7 @@ contains
     function get_variable_matching_dimension(ncid, name) result(varid)
         integer(ik), intent(in) :: ncid
         character(len=*), intent(in) :: name
-        character(len=max_var_name_length) :: other_name
+        character(len=max_name_length) :: other_name
         integer(ik) :: status, i, nvars, varid
 
         status = nf90_inquire(ncid, nVariables=nvars)
@@ -234,7 +245,7 @@ contains
     end subroutine create_axis
 
     function get_axis_index(self, name) result(idx)
-        class(netcdf_file), intent(inout) :: self
+        class(netcdf_file), intent(in) :: self
         character(len=*), intent(in) :: name
         integer(ik) :: i, idx
 
@@ -248,7 +259,7 @@ contains
     end function get_axis_index
 
     function read_axis(self, name) result(values)
-        class(netcdf_file), intent(inout) :: self
+        class(netcdf_file), intent(in) :: self
         character(len=*), intent(in) :: name
         integer(ik), allocatable :: values(:)
         integer(ik) :: status, idx, size, varid
@@ -276,6 +287,7 @@ contains
         type(netcdf_var) :: var
         type(netcdf_var), allocatable :: vars(:)
         integer(ik) :: dimids(size(dims))
+        character(len=max_name_length) :: dimnames(size(dims))
         integer(ik) :: status, varid, i, j, n
 
         do i = 1, size(self % vars)
@@ -290,10 +302,12 @@ contains
         ! since we have to put it as the last dimension if it's present
 
         dimids(:) = -1
+        dimnames(:) = ''
 
         do i = 1, size(dims)
             if (trim(dims(i)) == self % t_axis % name) then
                 dimids(size(dims)) = self % t_axis % dimid
+                dimnames(size(dims)) = self % t_axis % name
             end if
         end do
 
@@ -303,6 +317,7 @@ contains
             do j = 1, size(self % axes)
                 if (trim(dims(i)) == trim(self % axes(j) % name)) then
                     dimids(n) = self % axes(j) % dimid
+                    dimnames(n) = self % axes(j) % name
                 end if
             end do
             if (dimids(n) == -1) then
@@ -322,7 +337,7 @@ contains
         status = nf90_enddef(self % ncid)
         call handle_netcdf_error(status, 'create_variable')
 
-        var = netcdf_var(name, varid, dimids)
+        var = netcdf_var(name, varid, dimnames)
 
         vars = [self % vars, var]
         self % vars = vars
@@ -360,7 +375,7 @@ contains
 
         var = self % vars(idx)
 
-        if (any(var % dimids == self % t_axis % dimid)) then
+        if (any(var % dims == self % t_axis % name)) then
             status = nf90_put_var(                          &
                 self % ncid, var % varid, data,             &
                 start = [ 1, 1, self % t_axis % size ],     &
@@ -376,12 +391,11 @@ contains
 
     end subroutine write_variable
 
-    subroutine read_variable(self, name, dimids, data)
+    subroutine read_variable(self, name, data)
         class(netcdf_file), intent(in) :: self
         character(len=*), intent(in) :: name
-        integer(ik), intent(in) :: dimids(:)
         real(rk), intent(inout) :: data(:,:)
-        integer(ik), allocatable :: start(:), count(:)
+        integer(ik), allocatable :: start(:), count(:), dim_map(:)
         integer(ik) :: status, idx, i, j
 
         idx = self % get_variable_index(name)
@@ -392,25 +406,32 @@ contains
             call abort_now()
         end if
 
-        allocate(start(1:size(dimids)))
-        allocate(count(1:size(dimids)))
+        allocate(start(1:size(self % vars(idx) % dims)))
+        allocate(count(1:size(self % vars(idx) % dims)))
+        allocate(dim_map(1:size(self % vars(idx) % dims)))
 
-        do i = 1, size(dimids)
-            if (dimids(i) == self % t_axis % dimid) then
+        do i = 1, size(self % vars(idx) % dims)
+            if (self % vars(idx) % dims(i) == self % t_axis % name) then
                 start(i) = self % t_axis % size
                 count(i) = 1
+                dim_map(i) = 0
             else
                 start(i) = 1
-                do j = 1, size(self % axes)
-                    if (self % axes(j) % dimid == dimids(i)) &
-                        count(i) = self % axes(j) % size
-                end do
+
+                j = self % get_axis_index(self % vars(idx) % dims(i))
+                count(i) = self % axes(j) % size
+
+                if (any(self % vars(idx) % dims(i) == ['x ','xc','xf'])) then
+                    dim_map(i) = 1
+                else if (any(self % vars(idx) % dims(i) == ['y ','yc','yf'])) then
+                    dim_map(i) = config % nx
+                end if
             end if
         end do
 
         status = nf90_get_var(                           &
             self % ncid, self % vars(idx) % varid, data, &
-            start=start, count=count                     )
+            start=start, count=count, map=dim_map        )
 
         call handle_netcdf_error(status, 'read_variable')
 

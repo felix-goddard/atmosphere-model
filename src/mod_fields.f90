@@ -47,9 +47,8 @@ contains
                 call abort_now()
             end if
 
-            call initial_nc % read_variable(               &
-                names(i), initial_nc % vars(idx) % dimids, &
-                values(1:config % nx, 1:config % ny)       )
+            call initial_nc % read_variable(                  &
+                names(i), values(1:config % nx, 1:config % ny))
 
             select case (names(i))
               case ('h')
