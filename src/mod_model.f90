@@ -8,7 +8,7 @@ module mod_model
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
     use mod_sync, only: halo_exchange, allocate_sync_buffers
-    use mod_io, only: accumulate_output, write_output, write_restart_file
+    use mod_output, only: accumulate_output, write_output, write_restart_file
 
     implicit none
 
@@ -110,7 +110,7 @@ contains
         end do main_loop
 
         if (config % save_restart_file) then
-            call write_restart_file('output/restart.nc')
+            call write_restart_file(config % restart_filename)
         end if
 
     end subroutine run_model

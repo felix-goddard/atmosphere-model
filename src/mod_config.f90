@@ -10,12 +10,18 @@ module mod_config
     public :: main_config, init_config
   
     type :: Config
-      integer(ik) :: nx, ny
-      real(rk) :: Lx, Ly
-      real(rk) :: dx, dy
-      real(rk) :: t_final, dt_max
-      real(rk) :: dt_output
+      ! io control
       logical :: save_restart_file
+      character(len=:), allocatable :: initial_filename, restart_filename
+
+      ! time control
+      real(rk) :: dt_max, t_final, dt_output
+
+      ! domain parameters
+      integer(ik) :: nx, ny
+      real(rk) :: Lx, Ly, dx, dy
+
+      ! physics parameters
       real(rk) :: gravity, coriolis
     end type Config
 
@@ -26,23 +32,27 @@ module mod_config
     subroutine init_config(filename)
       character(len=*), intent(in) :: filename
       integer(ik) :: fileunit, iostat
+      real(rk) :: dx, dy, t_final, dt_max, dt_output
+
+      logical :: save_restart_file
+      character(len=99) :: initial_filename, restart_filename
+      namelist /io_control/ initial_filename, save_restart_file, restart_filename
+
+      character(len=99) :: max_timestep, run_duration, output_interval
+      namelist /time_control/ max_timestep, run_duration, output_interval
 
       integer(ik) :: nx, ny
-      logical :: save_restart_file
-      character(len=99) :: max_timestep, run_duration, output_interval
-      real(rk) :: dx, dy, t_final, dt_max, dt_output
       real(rk) :: Lx, Ly
-      real(rk) :: g, f
+      namelist /domain_parameters/ nx, ny, Lx, Ly
 
-      namelist /domain/ nx, ny, Lx, Ly
-      namelist /time_control/ save_restart_file, run_duration, output_interval, max_timestep
-      namelist /phys_param/ g, f
+      real(rk) :: g, f
+      namelist /physics_parameters/ g, f
 
       open(newunit=fileunit, file=filename, status='old', action='read')
 
-      read(fileunit, iostat=iostat, nml=domain)
+      read(fileunit, iostat=iostat, nml=io_control)
       if (iostat /= 0) then
-        write (log_str, '(a)') 'Could not read `domain` namelist'
+        write (log_str, '(a)') 'Could not read `io_control` namelist'
         call logger % fatal('init_config', log_str)
         call abort_now()
       end if
@@ -54,9 +64,16 @@ module mod_config
         call abort_now()
       end if
 
-      read(fileunit, iostat=iostat, nml=phys_param)
+      read(fileunit, iostat=iostat, nml=domain_parameters)
       if (iostat /= 0) then
-        write (log_str, '(a)') 'Could not read `phys_param` namelist'
+        write (log_str, '(a)') 'Could not read `domain_parameters` namelist'
+        call logger % fatal('init_config', log_str)
+        call abort_now()
+      end if
+
+      read(fileunit, iostat=iostat, nml=physics_parameters)
+      if (iostat /= 0) then
+        write (log_str, '(a)') 'Could not read `physics_parameters` namelist'
         call logger % fatal('init_config', log_str)
         call abort_now()
       end if
@@ -70,10 +87,12 @@ module mod_config
       dt_max = parse_duration(trim(max_timestep))
       dt_output = parse_duration(trim(output_interval))
 
-      main_config = Config(                            &
-        nx, ny, Lx, Ly, dx, dy,                        &
-        t_final, dt_max, dt_output, save_restart_file, &
-        g, f                                           )
+      main_config = Config(                                    &
+        save_restart_file, initial_filename, restart_filename, &
+        dt_max, t_final, dt_output,                            &
+        nx, ny, Lx, Ly, dx, dy,                                &
+        g, f                                                   )
+
     end subroutine init_config
   
   end module mod_config

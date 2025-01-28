@@ -8,6 +8,8 @@ matplotlib = "*"
 scipy = "*"
 xarray = "*"
 netcdf4 = "*"
+f90nml = "*"
+numpy = "*"
 
 [dev-packages]
 

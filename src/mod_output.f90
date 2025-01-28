@@ -1,4 +1,4 @@
-module mod_io
+module mod_output
 
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
@@ -10,7 +10,7 @@ module mod_io
     implicit none
 
     private
-    public :: init_io, finalise_io, accumulate_output, write_output, write_restart_file
+    public :: init_output, finalise_output, accumulate_output, write_output, write_restart_file
 
     type(netcdf_file) :: output_nc
 
@@ -30,24 +30,8 @@ module mod_io
 
 contains
 
-    subroutine init_io()
+    subroutine init_output()
         integer(ik) :: i
-
-        ! Create output netCDF
-
-        output_nc = create_netcdf('output/output.nc')
-
-        call output_nc % create_time_axis()
-
-        call output_nc % create_axis('x', &
-            [(-.5 * config % Lx + (i + .5) * config % dx, i = 0, config % nx - 1)])
-
-        call output_nc % create_axis('y', &
-            [(-.5 * config % Ly + (i + .5) * config % dy, i = 0, config % ny - 1)])
-
-        call output_nc % create_var('h', ['t', 'x', 'y'])
-        call output_nc % create_var('u', ['t', 'x', 'y'])
-        call output_nc % create_var('v', ['t', 'x', 'y'])
 
         ! Allocate output arrays
 
@@ -62,16 +46,36 @@ contains
         if (.not. allocated(gather_coarray)) &
             allocate(gather_coarray(1:config % nx, 1:config % ny)[*])
 
-        if (this_image() == 1 .and. .not. allocated(gather)) &
-            allocate(gather(1:config % nx, 1:config % ny))
-        
-    end subroutine init_io
+        if (this_image() == 1) then
 
-    subroutine finalise_io()
+            if (.not. allocated(gather)) &
+                allocate(gather(1:config % nx, 1:config % ny))
+
+            ! Create output netCDF
+
+            output_nc = create_netcdf('output/output.nc')
+
+            call output_nc % create_time_axis()
+
+            call output_nc % create_axis('x', &
+                [(-.5 * config % Lx + (i + .5) * config % dx, i = 0, config % nx - 1)])
+
+            call output_nc % create_axis('y', &
+                [(-.5 * config % Ly + (i + .5) * config % dy, i = 0, config % ny - 1)])
+
+            call output_nc % create_var('h', ['t', 'x', 'y'])
+            call output_nc % create_var('u', ['t', 'x', 'y'])
+            call output_nc % create_var('v', ['t', 'x', 'y'])
+
+        end if
+        
+    end subroutine init_output
+
+    subroutine finalise_output()
         
         call output_nc % close()
 
-    end subroutine finalise_io
+    end subroutine finalise_output
 
     subroutine accumulate_output(dt)
         real(rk), intent(in) :: dt
@@ -179,4 +183,4 @@ contains
         end if
     end subroutine write
 
-end module mod_io
+end module mod_output

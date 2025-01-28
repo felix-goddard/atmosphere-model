@@ -1,7 +1,7 @@
 program main
   
     use mod_log, only: init_logging, logger => main_logger, log_error, log_warning
-    use mod_io, only: init_io, finalise_io
+    use mod_output, only: init_output, finalise_output
     use mod_timing, only: init_timing, print_timing
     use mod_config, only: init_config
     use mod_model, only: init_model, run_model
@@ -29,22 +29,22 @@ program main
     ! conditions, etc.
     call init_model()
     sync all
-    if (this_image() == 1) then
+    if (this_image() == 1) &
       call logger % info('main', 'Initialised model fields')
 
-      ! Initialise the netCDF I/O; this creates the output file and its
-      ! structure (dimensions, coordinate values, etc.); this needs to
-      ! know model parameters hence why we do it after model initialisation.
-      call init_io()
-      call logger % info('main', 'Initialised file I/O')
-    end if
+    ! Initialise the netCDF output; this creates the output file and its
+    ! structure (dimensions, coordinate values, etc.); this needs to
+    ! know model parameters hence why we do it after model initialisation.
+    call init_output()
+    if (this_image() == 1) &
+      call logger % info('main', 'Initialised output')
 
     ! Run the model according to the config.
     call run_model()
 
     ! Close the output netCDF file cleanly and print timing information.
     if (this_image() == 1) then
-      call finalise_io()
+      call finalise_output()
       call print_timing()
     end if
   

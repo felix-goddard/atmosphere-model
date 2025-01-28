@@ -1,18 +1,23 @@
-&domain
+&io_control
+    initial_filename = 'initial.nc'
+    save_restart_file = T
+    restart_filename = 'output/restart.nc'
+/
+
+&time_control
+    max_timestep = "PT10S"
+    run_duration = "PT48H"
+    output_interval = "PT10M"
+/
+
+&domain_parameters
     nx = 200
     ny = 200
     Lx = 1500000
     Ly = 1500000
 /
 
-&time_control
-    save_restart_file = T
-    max_timestep = "PT10S"
-    run_duration = "PT48H"
-    output_interval = "PT10M"
-/
-
-&phys_param
-    g = 9.807
-    f = 1e-5
+&physics_parameters
+    g = 9.807 ! acceleration due to gravity, m/s2
+    f = 1e-5  ! coriolis parameter, 1/s
 /
