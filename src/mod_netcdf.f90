@@ -1,9 +1,7 @@
 module mod_netcdf
 
-    use iso_fortran_env, only: stderr => error_unit
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
-    use mod_config, only: config => main_config
     use mod_util, only: abort_now
     use netcdf, only:                                                                &
         nf90_open, nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable,      &
@@ -20,7 +18,7 @@ module mod_netcdf
 
     type :: netcdf_axis
         character(len=:), allocatable :: name
-        integer(ik) :: dimid, varid
+        integer(ik) :: size, dimid, varid
     end type
 
     type :: netcdf_var
@@ -32,14 +30,14 @@ module mod_netcdf
     type :: netcdf_file
         integer(ik) :: ncid
         type(netcdf_axis) :: t_axis ! time axis
-        integer(ik) :: t_idx = -1
         type(netcdf_axis), allocatable :: axes(:)
         type(netcdf_var), allocatable :: vars(:)
     contains
         procedure :: close => close_netcdf
         procedure :: create_time_axis, advance_time
-        procedure :: create_axis
-        procedure :: create_var, write_var, read_var
+        procedure :: create_axis, get_axis_index, read_axis
+        procedure :: create_variable, get_variable_index
+        procedure :: write_variable, read_variable
     end type
 
 contains
@@ -51,7 +49,7 @@ contains
         type(netcdf_var), allocatable :: vars(:)
         character(len=max_var_name_length) :: name
         integer(ik) :: status, i, j, length
-        integer(ik) :: ncid, dimid, varid, ndims, nvars, tdim
+        integer(ik) :: ncid, varid, ndims, nvars, tdim
         integer(ik), allocatable :: dimids(:)
 
         status = nf90_open(trim(filename), nf90_nowrite, ncid)
@@ -71,11 +69,9 @@ contains
 
             varid = get_variable_matching_dimension(ncid, name)
 
-            out % t_axis = netcdf_axis(name, tdim, varid)
-            out % t_idx = length
+            out % t_axis = netcdf_axis(name, length, tdim, varid)
         else
-            out % t_axis = netcdf_axis('', -1, -1)
-            out % t_idx = -1
+            out % t_axis = netcdf_axis('', 0, -1, -1)
         end if
 
         ! Get the other dimensions
@@ -86,7 +82,7 @@ contains
             if (trim(name) == trim(out % t_axis % name)) cycle
 
             varid = get_variable_matching_dimension(ncid, name)
-            axes = [axes, netcdf_axis(name, i, varid)]
+            axes = [axes, netcdf_axis(name, length, i, varid)]
         end do
 
         ! Get the variables
@@ -179,8 +175,7 @@ contains
         status = nf90_def_var(self % ncid, 't', nf90_float, dimid, varid)
         call handle_netcdf_error(status, 'create_time_axis')
 
-        self % t_axis = netcdf_axis('t', dimid, varid)
-        self % t_idx = 0
+        self % t_axis = netcdf_axis('t', 0, dimid, varid)
 
         status = nf90_enddef(self % ncid)
         call handle_netcdf_error(status, 'create_time_axis')
@@ -192,9 +187,10 @@ contains
         real(rk), intent(in) :: time
         integer(ik) :: status
 
-        self % t_idx = self % t_idx + 1
+        self % t_axis % size = self % t_axis % size + 1
 
-        status = nf90_put_var(self % ncid, self % t_axis % varid, time, start=[self % t_idx] )
+        status = nf90_put_var(self % ncid, self % t_axis % varid, &
+            time, start=[self % t_axis % size] )
         call handle_netcdf_error(status, 'advance_time')
 
     end subroutine advance_time
@@ -224,7 +220,7 @@ contains
         status = nf90_def_var(self % ncid, trim(name), nf90_float, dimid, varid)
         call handle_netcdf_error(status, 'create_axis')
 
-        axis = netcdf_axis(name, dimid, varid)
+        axis = netcdf_axis(name, size(points), dimid, varid)
 
         status = nf90_enddef(self % ncid)
         call handle_netcdf_error(status, 'create_axis')
@@ -237,7 +233,36 @@ contains
 
     end subroutine create_axis
 
-    subroutine create_var(self, name, dims)
+    function get_axis_index(self, name) result(idx)
+        class(netcdf_file), intent(inout) :: self
+        character(len=*), intent(in) :: name
+        integer(ik) :: i, idx
+
+        idx = -1
+        do i = 1, size(self % axes)
+            if (trim(self % axes(i) % name) == trim(name)) then
+                idx = i
+            end if
+        end do
+
+    end function get_axis_index
+
+    function read_axis(self, name) result(values)
+        class(netcdf_file), intent(inout) :: self
+        character(len=*), intent(in) :: name
+        integer(ik), allocatable :: values(:)
+        integer(ik) :: status, idx
+
+        idx = self % get_axis_index(name)
+
+        allocate(values(1:self % axes(idx) % size))
+
+        status = nf90_get_var(self % ncid, self % axes(idx) % varid, values)
+        call handle_netcdf_error(status, 'read_axis')
+
+    end function read_axis
+
+    subroutine create_variable(self, name, dims)
         class(netcdf_file), intent(inout) :: self
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: dims(:)
@@ -295,34 +320,43 @@ contains
         vars = [self % vars, var]
         self % vars = vars
 
-    end subroutine create_var
+    end subroutine create_variable
 
-    subroutine write_var(self, name, data)
+    function get_variable_index(self, name) result(idx)
+        class(netcdf_file), intent(in) :: self
+        character(len=*), intent(in) :: name
+        integer(ik) :: i, idx
+
+        idx = -1
+        do i = 1, size(self % vars)
+            if (trim(self % vars(i) % name) == trim(name)) then
+                idx = i
+            end if
+        end do
+
+    end function get_variable_index
+
+    subroutine write_variable(self, name, data)
         class(netcdf_file), intent(inout) :: self
         character(len=*), intent(in) :: name
         real(rk), intent(in) :: data(:,:)
         type(netcdf_var) :: var
-        logical :: found_var
-        integer(ik) :: status, i
+        integer(ik) :: status, idx
 
-        found_var = .false.
-        do i = 1, size(self % vars)
-            if (trim(name) == trim(self % vars(i) % name)) then
-                var = self % vars(i)
-                found_var = .true.
-            end if
-        end do
+        idx = self % get_variable_index(name)
 
-        if (.not. found_var) then
+        if (idx == -1) then
             write (log_str, '(a)') 'Unknown variable `' // trim(name) // '`.'
             call logger % fatal('write_var', log_str)
             call abort_now()
         end if
 
+        var = self % vars(idx)
+
         if (any(var % dimids == self % t_axis % dimid)) then
             status = nf90_put_var(                          &
                 self % ncid, var % varid, data,             &
-                start = [ 1, 1, self % t_idx ],             &
+                start = [ 1, 1, self % t_axis % size ],     &
                 count = [ size(data, 1), size(data, 2), 1 ] )
         else
             status = nf90_put_var(                       &
@@ -333,29 +367,24 @@ contains
 
         call handle_netcdf_error(status, 'write_var')
 
-    end subroutine write_var
+    end subroutine write_variable
 
-    subroutine read_var(self, name, data)
-        class(netcdf_file), intent(inout) :: self
+    subroutine read_variable(self, name, data)
+        class(netcdf_file), intent(in) :: self
         character(len=*), intent(in) :: name
         real(rk), intent(inout) :: data(:,:)
         type(netcdf_var) :: var
-        logical :: found_var
-        integer(ik) :: status, i
+        integer(ik) :: status, idx
 
-        found_var = .false.
-        do i = 1, size(self % vars)
-            if (trim(name) == trim(self % vars(i) % name)) then
-                var = self % vars(i)
-                found_var = .true.
-            end if
-        end do
+        idx = self % get_variable_index(name)
 
-        if (.not. found_var) then
+        if (idx == -1) then
             write (log_str, '(a)') 'Unknown variable `' // trim(name) // '`.'
             call logger % fatal('read_var', log_str)
             call abort_now()
         end if
+
+        var = self % vars(idx)
 
         if (any(var % dimids == self % t_axis % dimid)) then
             write (log_str, '(a)') 'Reading variables with time axis is not implemented.'
@@ -370,7 +399,7 @@ contains
 
         call handle_netcdf_error(status, 'read_var')
 
-    end subroutine read_var
+    end subroutine read_variable
 
     subroutine handle_netcdf_error(errcode, source)
         integer(ik), intent(in) :: errcode

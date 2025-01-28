@@ -20,57 +20,47 @@ module mod_fields
 
 contains
 
-    subroutine init_prognostic_fields()
-        integer(ik) :: i, j
-        character(len=:), allocatable :: names(:)
+    subroutine init_prognostic_fields(initial_nc)
+        ! Allocate the arrays for the prognostic fields and fill them
+        ! from the initial condition file.
+
+        type(netcdf_file), intent(in) :: initial_nc
         real(rk), allocatable :: values(:,:)
-        type(netcdf_file) :: initial_nc
+        character(len=:), allocatable :: names(:)
+        integer(ik) :: i, idx
 
         if (.not. allocated(h))  allocate(h (is:ie, js:je))
         if (.not. allocated(ud)) allocate(ud(is:ie, js:je))
         if (.not. allocated(vd)) allocate(vd(is:ie, js:je))
 
-        initial_nc = open_netcdf(config % initial_filename)
-
-        ! Check we have all the expected coordinates
-        names = ['xc', 'yc', 'xf', 'yf']
-        axis_loop: do i = 1, size(names)
-            do j = 1, size(initial_nc % axes)
-                if (trim(initial_nc % axes(j) % name) == trim(names(i))) &
-                    cycle axis_loop
-            end do
-            write (log_str, '(a)') 'Could not find axis `' // trim(names(i)) &
-                // '` in initial condition netCDF.'
-            call logger % fatal('init_prognostic_fields', log_str)
-            call abort_now()
-        end do axis_loop
-
-        ! Check we have all the expected variables
-        names = ['h', 'u', 'v']
-        var_loop: do i = 1, size(names)
-            do j = 1, size(initial_nc % vars)
-                if (trim(initial_nc % vars(j) % name) == trim(names(i))) &
-                    cycle var_loop
-            end do
-            write (log_str, '(a)') 'Could not find variable `' // trim(names(i)) &
-                // '` in initial condition netCDF.'
-            call logger % fatal('init_prognostic_fields', log_str)
-            call abort_now()
-        end do var_loop
-
         allocate(values(1:config % nx, 1:config % ny))
 
-        call initial_nc % read_var('h', values(1:config % nx, 1:config % ny))
-        h(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+        names = ['h', 'u', 'v']
+        do i = 1, size(names)
 
-        call initial_nc % read_var('u', values(1:config % nx, 1:config % ny))
-        ud(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+            idx = initial_nc % get_variable_index(names(i))
 
-        call initial_nc % read_var('v', values(1:config % nx, 1:config % ny))
-        vd(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+            if (idx == -1) then
+                write (log_str, '(a)') 'Could not find variable `' &
+                    // trim(names(i)) // '` in initial condition netCDF.'
+                call logger % fatal('init_prognostic_fields', log_str)
+                call abort_now()
+            end if
+
+            call initial_nc % read_variable(                  &
+                names(i), values(1:config % nx, 1:config % ny))
+
+            select case (names(i))
+              case ('h')
+                h(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+              case ('u')
+                ud(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+              case ('v')
+                vd(isd:ied, jsd:jed) = values(isd:ied, jsd:jed)
+            end select
+        end do
 
         deallocate(values)
-        call initial_nc % close()
 
     end subroutine init_prognostic_fields
 

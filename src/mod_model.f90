@@ -3,7 +3,9 @@ module mod_model
     use mod_kinds, only: ik, rk
     use mod_log, only: logger => main_logger, log_str
     use mod_timing, only: timing_on, timing_off
-    use mod_config, only: config => main_config
+    use mod_config, only: config => main_config, read_config_file
+    use mod_netcdf, only: netcdf_file
+    use mod_input, only: read_initial_file
     use mod_tiles, only: init_tiles
     use mod_fields, only: init_prognostic_fields
     use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
@@ -15,6 +17,7 @@ module mod_model
     private
     public :: init_model, run_model
 
+    type(netcdf_file) :: initial_netcdf
     real(rk) :: previous_write_time
     logical :: write_this_step, stable
 
@@ -22,8 +25,25 @@ contains
 
     subroutine init_model()
 
+        ! Load the config file; this leaves computational domain info
+        ! like nx and dx unset, which is then filled when we load the
+        ! initial condition netCDF.
+        call read_config_file('config.nml')
+        if (this_image() == 1) &
+            call logger % info('main', 'Loaded config')
+
+        initial_netcdf = read_initial_file()
         call init_tiles()
-        call init_prognostic_fields()
+
+        ! After this point, the main config is fully initialised
+
+        call init_prognostic_fields(initial_netcdf)
+        call initial_netcdf % close()
+
+        if (this_image() == 1) &
+            call logger % info('main', 'Loaded initial condition from ' &
+            // config % initial_filename)
+
         call allocate_sw_dyn_arrays()
         call allocate_sync_buffers()
 
@@ -34,6 +54,9 @@ contains
         previous_write_time = 0.
         write_this_step = .false.
         stable = .true.
+
+        if (this_image() == 1) &
+            call logger % info('main', 'Initialised model fields')
 
     end subroutine init_model
 

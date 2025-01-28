@@ -10,13 +10,6 @@
     output_interval = "PT10M"
 /
 
-&domain_parameters
-    nx = 200
-    ny = 200
-    Lx = 1500000
-    Ly = 1500000
-/
-
 &physics_parameters
     g = 9.807 ! acceleration due to gravity, m/s2
     f = 1e-5  ! coriolis parameter, 1/s

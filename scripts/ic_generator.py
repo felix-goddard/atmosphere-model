@@ -2,14 +2,15 @@ import f90nml
 import numpy as np
 import xarray as xr
 
+config = f90nml.read('config.nml')
+
 #=======================================================
 # Domain information
 
-nml = f90nml.read('config.nml')
-nx = nml['domain_parameters']['nx']
-ny = nml['domain_parameters']['ny']
-Lx = nml['domain_parameters']['Lx']
-Ly = nml['domain_parameters']['Ly']
+nx = 200
+ny = 200
+Lx = 1500e3
+Ly = 1500e3
 
 dx = Lx / nx
 dy = Ly / ny
@@ -41,8 +42,8 @@ height = 20
 decay = 8e-11
 h[:,:] = 10e3 - height * np.exp(-decay * radius(mass_xs, mass_ys)**2)
 
-f = nml['physics_parameters']['f']
-g = nml['physics_parameters']['g']
+f = config['physics_parameters']['f']
+g = config['physics_parameters']['g']
 
 r = radius(mass_xs, face_ys)
 u[:,:] = -(face_ys - y_center) * np.exp(-decay * r**2)

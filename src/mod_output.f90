@@ -1,7 +1,6 @@
 module mod_output
 
     use mod_kinds, only: ik, rk
-    use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
     use mod_netcdf, only: netcdf_file, create_netcdf
     use mod_tiles, only: isd, ied, jsd, jed
@@ -63,9 +62,9 @@ contains
             call output_nc % create_axis('y', &
                 [(-.5 * config % Ly + (i + .5) * config % dy, i = 0, config % ny - 1)])
 
-            call output_nc % create_var('h', ['t', 'x', 'y'])
-            call output_nc % create_var('u', ['t', 'x', 'y'])
-            call output_nc % create_var('v', ['t', 'x', 'y'])
+            call output_nc % create_variable('h', ['t', 'x', 'y'])
+            call output_nc % create_variable('u', ['t', 'x', 'y'])
+            call output_nc % create_variable('v', ['t', 'x', 'y'])
 
         end if
 
@@ -155,9 +154,9 @@ contains
         call restart_nc % create_axis('yf', &
             [(-.5 * config % Ly + i * config % dy, i = 0, config % ny - 1)])
 
-        call restart_nc % create_var('h', ['xc', 'yc'])
-        call restart_nc % create_var('u', ['xc', 'yf'])
-        call restart_nc % create_var('v', ['xf', 'yc'])
+        call restart_nc % create_variable('h', ['xc', 'yc'])
+        call restart_nc % create_variable('u', ['xc', 'yf'])
+        call restart_nc % create_variable('v', ['xf', 'yc'])
 
         call write(restart_nc, h(isd:ied, jsd:jed), 'h')
         call write(restart_nc, ud(isd:ied, jsd:jed), 'u')
@@ -171,7 +170,6 @@ contains
         type(netcdf_file), intent(inout) :: netcdf
         real(rk), intent(in) :: field(isd:ied, jsd:jed)
         character(len=*), intent(in) :: name
-        integer(ik) :: varid
 
         sync all
         gather_coarray(isd:ied, jsd:jed)[1] = field(:,:)
@@ -179,7 +177,7 @@ contains
 
         if (this_image() == 1) then
             gather(:,:) = gather_coarray(:,:)
-            call netcdf % write_var(name, gather)
+            call netcdf % write_variable(name, gather)
         end if
     end subroutine write
 

@@ -3,7 +3,6 @@ program main
     use mod_log, only: init_logging, logger => main_logger, log_error, log_warning
     use mod_output, only: init_output, finalise_output
     use mod_timing, only: init_timing, print_timing
-    use mod_config, only: init_config
     use mod_model, only: init_model, run_model
 
     implicit none
@@ -20,21 +19,15 @@ program main
     if (this_image() == 1) &
         call logger % info('main', 'Initialised timer')
 
-    ! Load the configuration file; this is needed for model setup.
-    call init_config('config.nml')
-    if (this_image() == 1) &
-        call logger % info('main', 'Loaded config file')
-
-    ! Initialise the model itself; this allocates arrays, sets up initial
-    ! conditions, etc.
+    ! Initialise the model itself; this loads the config file, allocates
+    ! arrays, sets up initial conditions, etc.
     call init_model()
     sync all
-    if (this_image() == 1) &
-        call logger % info('main', 'Initialised model fields')
 
-    ! Initialise the netCDF output; this creates the output file and its
-    ! structure (dimensions, coordinate values, etc.); this needs to
-    ! know model parameters hence why we do it after model initialisation.
+    ! Initialise model output; this allocates the output accumulation
+    ! arrays and on the first image creates the output netCDF file.
+    ! This needs to know model parameters hence why we do it after
+    ! model initialisation.
     call init_output()
     if (this_image() == 1) &
         call logger % info('main', 'Initialised output')

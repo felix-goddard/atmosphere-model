@@ -7,7 +7,7 @@ module mod_config
     implicit none
 
     private
-    public :: main_config, init_config
+    public :: main_config, read_config_file
 
     type :: Config
         ! io control
@@ -29,10 +29,10 @@ module mod_config
 
 contains
 
-    subroutine init_config(filename)
+    subroutine read_config_file(filename)
         character(len=*), intent(in) :: filename
         integer(ik) :: fileunit, iostat
-        real(rk) :: dx, dy, t_final, dt_max, dt_output
+        real(rk) :: t_final, dt_max, dt_output
 
         logical :: save_restart_file
         character(len=99) :: initial_filename, restart_filename
@@ -40,10 +40,6 @@ contains
 
         character(len=99) :: max_timestep, run_duration, output_interval
         namelist /time_control/ max_timestep, run_duration, output_interval
-
-        integer(ik) :: nx, ny
-        real(rk) :: Lx, Ly
-        namelist /domain_parameters/ nx, ny, Lx, Ly
 
         real(rk) :: g, f
         namelist /physics_parameters/ g, f
@@ -64,13 +60,6 @@ contains
             call abort_now()
         end if
 
-        read(fileunit, iostat=iostat, nml=domain_parameters)
-        if (iostat /= 0) then
-            write (log_str, '(a)') 'Could not read `domain_parameters` namelist'
-            call logger % fatal('init_config', log_str)
-            call abort_now()
-        end if
-
         read(fileunit, iostat=iostat, nml=physics_parameters)
         if (iostat /= 0) then
             write (log_str, '(a)') 'Could not read `physics_parameters` namelist'
@@ -80,9 +69,6 @@ contains
 
         close(fileunit)
 
-        dx = Lx / nx
-        dy = Ly / ny
-
         t_final = parse_duration(trim(run_duration))
         dt_max = parse_duration(trim(max_timestep))
         dt_output = parse_duration(trim(output_interval))
@@ -90,9 +76,9 @@ contains
         main_config = Config(                                      &
             save_restart_file, initial_filename, restart_filename, &
             dt_max, t_final, dt_output,                            &
-            nx, ny, Lx, Ly, dx, dy,                                &
+            -1, -1, -1, -1, -1, -1,                                &
             g, f                                                   )
 
-    end subroutine init_config
+    end subroutine read_config_file
 
 end module mod_config
