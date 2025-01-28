@@ -62,14 +62,15 @@ v[:,:] *= -f*r/2 + np.sqrt((f*r/2)**2 + (g * 2*height*decay * r**2 * np.exp(-dec
 
 xr.Dataset(
     data_vars=dict(
-        h=(['xc', 'yc'], h),
-        u=(['xc', 'yf'], u),
-        v=(['xf', 'yc'], v),
+        h=(['xc', 'yc', 't'], h[..., np.newaxis]),
+        u=(['xc', 'yf', 't'], u[..., np.newaxis]),
+        v=(['xf', 'yc', 't'], v[..., np.newaxis]),
     ),
     coords=dict(
+        t=('t', [0]),
         xc=('xc', mass_xs[0,:]),
         yc=('yc', mass_ys[:,0]),
         xf=('xf', face_xs[0,:]),
         yf=('yf', face_ys[:,0]),
     ),
-).to_netcdf('initial.nc')
+).to_netcdf('initial.nc', unlimited_dims=['t'])

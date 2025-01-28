@@ -47,8 +47,8 @@ contains
             if (names(i) == 'xc' .or. names(i) == 'xf') then
 
                 if (xsize == -1) then
-                    xsize = initial_nc % axes(i) % size
-                else if (initial_nc % axes(i) % size /= xsize) then
+                    xsize = initial_nc % axes(idx) % size
+                else if (initial_nc % axes(idx) % size /= xsize) then
                     write (log_str, '(a)') 'Inconsistent x axis sizes in initial condition netCDF.'
                     call logger % fatal('init_prognostic_fields', log_str)
                     call abort_now()
@@ -57,8 +57,8 @@ contains
             else if (names(i) == 'yc' .or. names(i) == 'yf') then
 
                 if (ysize == -1) then
-                    ysize = initial_nc % axes(i) % size
-                else if (initial_nc % axes(i) % size /= ysize) then
+                    ysize = initial_nc % axes(idx) % size
+                else if (initial_nc % axes(idx) % size /= ysize) then
                     write (log_str, '(a)') 'Inconsistent y axis sizes in initial condition netCDF.'
                     call logger % fatal('init_prognostic_fields', log_str)
                     call abort_now()
@@ -67,7 +67,7 @@ contains
             end if
         end do
 
-        ! Extract grid properties and put them in the config
+        ! Extract grid and time properties and put them in the config
 
         config % nx = xsize
         config % ny = ysize
@@ -93,6 +93,16 @@ contains
 
         config % Ly = maxval(points) - minval(points) + dy
         config % dy = dy
+
+        if (initial_nc % t_axis % dimid == -1) then
+            write (log_str, '(a)') 'Could not find axis `t` in initial condition netCDF.'
+            call logger % fatal('init_prognostic_fields', log_str)
+            call abort_now()
+        end if
+
+        points = initial_nc % read_axis('t')
+        config % t_initial = points(1)
+        config % t_final = config % t_final + points(1)
 
     end function read_initial_file
 

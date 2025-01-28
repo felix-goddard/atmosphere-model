@@ -51,7 +51,7 @@ contains
         call halo_exchange()
         call timing_off('HALO EXCHANGE')
 
-        previous_write_time = 0.
+        previous_write_time = config % t_initial
         write_this_step = .false.
         stable = .true.
 
@@ -80,11 +80,11 @@ contains
         end if
 
         n = 0
-        time = 0.
+        time = config % t_initial
 
         ! Write the initial state
         call accumulate_output(1._rk)
-        call write_output(0._rk)
+        call write_output(time)
 
         main_loop: do while (time < config % t_final)
 
@@ -133,7 +133,7 @@ contains
         end do main_loop
 
         if (config % save_restart_file) then
-            call write_restart_file(config % restart_filename)
+            call write_restart_file(config % restart_filename, time)
         end if
 
     end subroutine run_model

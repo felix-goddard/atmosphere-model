@@ -87,9 +87,9 @@ def update(i):
                 ax.set_ylim(bottom=min(current_low, low - widen), top=max(current_high, high + widen))
             else:
                 ax.set_ylim(bottom=low - widen, top=high + widen)
-        if time.max() > 0:
+        if time.max() > time.min():
             for i in range(1,5):
-                axs[i].set_xlim(0, time.max())
+                axs[i].set_xlim(time.min(), time.max())
                 if i != 4: axs[i].set_xticklabels([])
 
 ani = FuncAnimation(fig, update, frames=range(len(data.t)), init_func=init, interval=50)

@@ -15,7 +15,7 @@ module mod_config
         character(len=:), allocatable :: initial_filename, restart_filename
 
         ! time control
-        real(rk) :: dt_max, t_final, dt_output
+        real(rk) :: dt_max, dt_output, t_initial, t_final
 
         ! domain parameters
         integer(ik) :: nx, ny
@@ -75,7 +75,7 @@ contains
 
         main_config = Config(                                      &
             save_restart_file, initial_filename, restart_filename, &
-            dt_max, t_final, dt_output,                            &
+            dt_max, dt_output, 0, t_final,                         &
             -1, -1, -1, -1, -1, -1,                                &
             g, f                                                   )
 

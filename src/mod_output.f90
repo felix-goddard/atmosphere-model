@@ -131,12 +131,16 @@ contains
 
     end subroutine write_output
 
-    subroutine write_restart_file(filename)
+    subroutine write_restart_file(filename, time)
         character(len=*), intent(in) :: filename
+        real(rk), intent(in) :: time
         type(netcdf_file) :: restart_nc
         integer(ik) :: i
 
         restart_nc = create_netcdf(filename)
+
+        call restart_nc % create_time_axis()
+        call restart_nc % advance_time(time)
 
         ! x centers
         call restart_nc % create_axis('xc', &

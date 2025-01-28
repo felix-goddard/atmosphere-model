@@ -251,13 +251,20 @@ contains
         class(netcdf_file), intent(inout) :: self
         character(len=*), intent(in) :: name
         integer(ik), allocatable :: values(:)
-        integer(ik) :: status, idx
+        integer(ik) :: status, idx, size, varid
 
-        idx = self % get_axis_index(name)
+        if (trim(self % t_axis % name) == trim(name)) then
+            size = self % t_axis % size
+            varid = self % t_axis % varid
+        else
+            idx = self % get_axis_index(name)
+            size = self % axes(idx) % size
+            varid = self % axes(idx) % varid
+        end if
+        
+        allocate(values(1:size))
 
-        allocate(values(1:self % axes(idx) % size))
-
-        status = nf90_get_var(self % ncid, self % axes(idx) % varid, values)
+        status = nf90_get_var(self % ncid, varid, values)
         call handle_netcdf_error(status, 'read_axis')
 
     end function read_axis
@@ -274,7 +281,7 @@ contains
         do i = 1, size(self % vars)
             if (self % vars(i) % name == trim(name)) then
                 write (log_str, '(a)') 'Variable by name `' // trim(name) // '` already exists.'
-                call logger % fatal('create_var', log_str)
+                call logger % fatal('create_variable', log_str)
                 call abort_now()
             end if
         end do
@@ -300,20 +307,20 @@ contains
             end do
             if (dimids(n) == -1) then
                 write (log_str, '(a)') 'Unknown dimension `' // trim(dims(i)) // '`.'
-                call logger % fatal('create_var', log_str)
+                call logger % fatal('create_variable', log_str)
                 call abort_now()
             end if
             n = n + 1
         end do
 
         status = nf90_redef(self % ncid)
-        call handle_netcdf_error(status, 'create_var')
+        call handle_netcdf_error(status, 'create_variable')
 
         status = nf90_def_var(self % ncid, name, nf90_float, dimids, varid)
-        call handle_netcdf_error(status, 'create_var')
+        call handle_netcdf_error(status, 'create_variable')
 
         status = nf90_enddef(self % ncid)
-        call handle_netcdf_error(status, 'create_var')
+        call handle_netcdf_error(status, 'create_variable')
 
         var = netcdf_var(name, varid, dimids)
 
@@ -347,7 +354,7 @@ contains
 
         if (idx == -1) then
             write (log_str, '(a)') 'Unknown variable `' // trim(name) // '`.'
-            call logger % fatal('write_var', log_str)
+            call logger % fatal('write_variable', log_str)
             call abort_now()
         end if
 
@@ -365,39 +372,47 @@ contains
                 count = [ size(data, 1), size(data, 2) ] )
         end if
 
-        call handle_netcdf_error(status, 'write_var')
+        call handle_netcdf_error(status, 'write_variable')
 
     end subroutine write_variable
 
-    subroutine read_variable(self, name, data)
+    subroutine read_variable(self, name, dimids, data)
         class(netcdf_file), intent(in) :: self
         character(len=*), intent(in) :: name
+        integer(ik), intent(in) :: dimids(:)
         real(rk), intent(inout) :: data(:,:)
-        type(netcdf_var) :: var
-        integer(ik) :: status, idx
+        integer(ik), allocatable :: start(:), count(:)
+        integer(ik) :: status, idx, i, j
 
         idx = self % get_variable_index(name)
 
         if (idx == -1) then
             write (log_str, '(a)') 'Unknown variable `' // trim(name) // '`.'
-            call logger % fatal('read_var', log_str)
+            call logger % fatal('read_variable', log_str)
             call abort_now()
         end if
 
-        var = self % vars(idx)
+        allocate(start(1:size(dimids)))
+        allocate(count(1:size(dimids)))
 
-        if (any(var % dimids == self % t_axis % dimid)) then
-            write (log_str, '(a)') 'Reading variables with time axis is not implemented.'
-            call logger % fatal('read_var', log_str)
-            call abort_now()
-        else
-            status = nf90_get_var(                       &
-                self % ncid, var % varid, data,          &
-                start = [ 1, 1 ],                        &
-                count = [ size(data, 1), size(data, 2) ] )
-        end if
+        do i = 1, size(dimids)
+            if (dimids(i) == self % t_axis % dimid) then
+                start(i) = self % t_axis % size
+                count(i) = 1
+            else
+                start(i) = 1
+                do j = 1, size(self % axes)
+                    if (self % axes(j) % dimid == dimids(i)) &
+                        count(i) = self % axes(j) % size
+                end do
+            end if
+        end do
 
-        call handle_netcdf_error(status, 'read_var')
+        status = nf90_get_var(                           &
+            self % ncid, self % vars(idx) % varid, data, &
+            start=start, count=count                     )
+
+        call handle_netcdf_error(status, 'read_variable')
 
     end subroutine read_variable
 
