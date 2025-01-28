@@ -15,6 +15,7 @@ module mod_config
       real(rk) :: dx, dy
       real(rk) :: t_final, dt_max
       real(rk) :: dt_output
+      logical :: save_restart_file
       real(rk) :: gravity, coriolis
     end type Config
 
@@ -27,13 +28,14 @@ module mod_config
       integer(ik) :: fileunit, iostat
 
       integer(ik) :: nx, ny
+      logical :: save_restart_file
       character(len=99) :: max_timestep, run_duration, output_interval
       real(rk) :: dx, dy, t_final, dt_max, dt_output
       real(rk) :: Lx, Ly
       real(rk) :: g, f
 
       namelist /domain/ nx, ny, Lx, Ly
-      namelist /time_control/ run_duration, output_interval, max_timestep
+      namelist /time_control/ save_restart_file, run_duration, output_interval, max_timestep
       namelist /phys_param/ g, f
 
       open(newunit=fileunit, file=filename, status='old', action='read')
@@ -68,7 +70,10 @@ module mod_config
       dt_max = parse_duration(trim(max_timestep))
       dt_output = parse_duration(trim(output_interval))
 
-      main_config = Config(nx, ny, Lx, Ly, dx, dy, t_final, dt_max, dt_output, g, f)
+      main_config = Config(                            &
+        nx, ny, Lx, Ly, dx, dy,                        &
+        t_final, dt_max, dt_output, save_restart_file, &
+        g, f                                           )
     end subroutine init_config
   
   end module mod_config

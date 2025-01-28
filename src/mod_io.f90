@@ -10,7 +10,7 @@ module mod_io
     implicit none
 
     private
-    public :: init_io, finalise_io, accumulate_output, write_output
+    public :: init_io, finalise_io, accumulate_output, write_output, write_restart_file
 
     type(netcdf_file) :: output_nc
 
@@ -114,13 +114,13 @@ contains
         output_field(:,:,:) = output_field(:,:,:) / accumulation_time
 
         ! Output height field
-        call write(output_field(:,:,H_IDX), 'h')
+        call write(output_nc, output_field(:,:,H_IDX), 'h')
 
         ! Output u wind
-        call write(output_field(:,:,U_IDX), 'u')
+        call write(output_nc, output_field(:,:,U_IDX), 'u')
 
         ! Output v wind
-        call write(output_field(:,:,V_IDX), 'v')
+        call write(output_nc, output_field(:,:,V_IDX), 'v')
 
         output_field(:,:,:) = 0.
         compensation(:,:,:) = 0.
@@ -128,7 +128,43 @@ contains
 
     end subroutine write_output
 
-    subroutine write(field, name)
+    subroutine write_restart_file(filename)
+        character(len=*), intent(in) :: filename
+        type(netcdf_file) :: restart_nc
+        integer(ik) :: i
+
+        restart_nc = create_netcdf(filename)
+
+        ! x centers
+        call restart_nc % create_axis('xc', &
+            [(-.5 * config % Lx + (i + .5) * config % dx, i = 0, config % nx - 1)])
+
+        ! x faces
+        call restart_nc % create_axis('xf', &
+            [(-.5 * config % Lx + i * config % dx, i = 0, config % nx - 1)])
+
+        ! y centers
+        call restart_nc % create_axis('yc', &
+            [(-.5 * config % Ly + (i + .5) * config % dy, i = 0, config % ny - 1)])
+
+        ! y faces
+        call restart_nc % create_axis('yf', &
+            [(-.5 * config % Ly + i * config % dy, i = 0, config % ny - 1)])
+
+        call restart_nc % create_var('h', ['xc', 'yc'])
+        call restart_nc % create_var('u', ['xc', 'yf'])
+        call restart_nc % create_var('v', ['xf', 'yc'])
+
+        call write(restart_nc, h(isd:ied, jsd:jed), 'h')
+        call write(restart_nc, ud(isd:ied, jsd:jed), 'u')
+        call write(restart_nc, vd(isd:ied, jsd:jed), 'v')
+
+        call restart_nc % close()
+        
+    end subroutine write_restart_file
+
+    subroutine write(netcdf, field, name)
+        type(netcdf_file), intent(inout) :: netcdf
         real(rk), intent(in) :: field(isd:ied, jsd:jed)
         character(len=*), intent(in) :: name
         integer(ik) :: varid
@@ -139,7 +175,7 @@ contains
 
         if (this_image() == 1) then
             gather(:,:) = gather_coarray(:,:)
-            call output_nc % put_timeslice(name, gather)
+            call netcdf % write_var(name, gather)
         end if
     end subroutine write
 

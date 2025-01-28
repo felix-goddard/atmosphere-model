@@ -6,9 +6,10 @@
 /
 
 &time_control
-    max_timestep = "PT20S"
-    run_duration = "PT12H"
-    output_interval = "PT1M"
+    save_restart_file = T
+    max_timestep = "PT10S"
+    run_duration = "PT48H"
+    output_interval = "PT10M"
 /
 
 &phys_param

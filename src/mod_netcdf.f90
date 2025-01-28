@@ -20,16 +20,27 @@ module mod_netcdf
     type :: netcdf_file
         private
         integer(ik) :: ncid
-        integer(ik) :: tdim = -1, tvar = -1, tidx = -1
-        character(len=max_var_name_length), allocatable :: axis_name(:), var_name(:)
-        integer(ik), allocatable :: axis_dimid(:), axis_varid(:), var_id(:)
+        integer(ik) :: tdim = -1, tvar = -1, tidx = -1 ! time axis
+        type(netcdf_axis), allocatable :: axes(:)
+        type(netcdf_var), allocatable :: vars(:)
     contains
         procedure :: close => close_netcdf
         procedure :: create_time_axis
         procedure :: advance_time
         procedure :: create_axis
         procedure :: create_var
-        procedure :: put_timeslice
+        procedure :: write_var
+    end type
+
+    type :: netcdf_axis
+        character(len=:), allocatable :: name
+        integer(ik) :: dimid, varid
+    end type
+
+    type :: netcdf_var
+        character(len=:), allocatable :: name
+        integer(ik) :: varid
+        integer(ik), allocatable :: dimids(:)
     end type
 
 contains
@@ -47,11 +58,8 @@ contains
 
         out = netcdf_file(ncid)
 
-        out % axis_name = [character ::]
-        out % var_name = [character ::]
-        out % axis_dimid = [integer(ik) ::]
-        out % axis_varid = [integer(ik) ::]
-        out % var_id = [integer(ik) ::]
+        out % axes = [netcdf_axis ::]
+        out % vars = [netcdf_var ::]
 
     end function
 
@@ -101,14 +109,16 @@ contains
         character(len=*), intent(in) :: name
         real(rk), intent(in) :: points(:)
         integer(ik) :: status, dimid, varid, i
-        character(len=:), allocatable :: axis_name(:)
-        integer(ik), allocatable :: axis_dimid(:), axis_varid(:)
+        type(netcdf_axis), allocatable :: axes(:)
+        type(netcdf_axis) :: axis
+        ! character(len=:), allocatable :: axis_name(:)
+        ! integer(ik), allocatable :: axis_dimid(:), axis_varid(:)
 
         status = nf90_redef(self % ncid)
         call handle_netcdf_error(status, 'create_axis')
 
-        do i = 1, size(self % axis_varid)
-            if (trim(self % axis_name(i)) == trim(name)) then
+        do i = 1, size(self % axes)
+            if (trim(self % axes(i) % name) == trim(name)) then
                 write (log_str, '(a)') 'Axis by name `' // trim(name) // '` already exists.'
                 call logger % fatal('create_axis', log_str)
                 call abort_now()
@@ -118,14 +128,10 @@ contains
         status = nf90_def_dim(self % ncid, trim(name), size(points), dimid)
         call handle_netcdf_error(status, 'create_axis')
 
-        axis_name = [self % axis_name, trim(name)]
-        axis_dimid = [self % axis_dimid, dimid]
-        axis_varid = [self % axis_varid, -1]
-
         status = nf90_def_var(self % ncid, trim(name), nf90_float, dimid, varid)
         call handle_netcdf_error(status, 'create_axis')
 
-        axis_varid(i+1) = varid
+        axis = netcdf_axis(name, dimid, varid)
 
         status = nf90_enddef(self % ncid)
         call handle_netcdf_error(status, 'create_axis')
@@ -133,9 +139,8 @@ contains
         status = nf90_put_var(self % ncid, varid, points)
         call handle_netcdf_error(status, 'create_axis')
 
-        self % axis_name = axis_name
-        self % axis_dimid = axis_dimid
-        self % axis_varid = axis_varid
+        axes = [self % axes, axis]
+        self % axes = axes
 
     end subroutine create_axis
 
@@ -143,13 +148,13 @@ contains
         class(netcdf_file), intent(inout) :: self
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: dims(:)
-        character(len=:), allocatable :: var_name(:)
-        integer(ik), allocatable :: var_id(:)
+        type(netcdf_var) :: var
+        type(netcdf_var), allocatable :: vars(:)
         integer(ik) :: dimids(size(dims))
         integer(ik) :: status, varid, i, j, n
 
-        do i = 1, size(self % var_name)
-            if (self % var_name(i) == trim(name)) then
+        do i = 1, size(self % vars)
+            if (self % vars(i) % name == trim(name)) then
                 write (log_str, '(a)') 'Variable by name `' // trim(name) // '` already exists.'
                 call logger % fatal('create_var', log_str)
                 call abort_now()
@@ -170,9 +175,9 @@ contains
         n = 1
         do i = 1, size(dims)
             if (trim(dims(i)) == 't') cycle
-            do j = 1, size(self % axis_name)
-                if (trim(dims(i)) == trim(self % axis_name(j))) then
-                    dimids(n) = self % axis_dimid(j)
+            do j = 1, size(self % axes)
+                if (trim(dims(i)) == trim(self % axes(j) % name)) then
+                    dimids(n) = self % axes(j) % dimid
                 end if
             end do
             if (dimids(n) == -1) then
@@ -192,40 +197,50 @@ contains
         status = nf90_enddef(self % ncid)
         call handle_netcdf_error(status, 'create_var')
 
-        var_name = [self % var_name, name]
-        var_id = [self % var_id, varid]
+        var = netcdf_var(name, varid, dimids)
 
-        self % var_name = var_name
-        self % var_id = var_id
+        vars = [self % vars, var]
+        self % vars = vars
 
     end subroutine create_var
 
-    subroutine put_timeslice(self, name, data)
+    subroutine write_var(self, name, data)
         class(netcdf_file), intent(inout) :: self
         character(len=*), intent(in) :: name
         real(rk), intent(in) :: data(:,:)
-        integer(ik) :: status, i, varid
+        type(netcdf_var) :: var
+        logical :: found_var
+        integer(ik) :: status, i
 
-        varid = -1
-        do i = 1, size(self % var_name)
-            if (trim(name) == trim(self % var_name(i))) &
-                varid = self % var_id(i)
+        found_var = .false.
+        do i = 1, size(self % vars)
+            if (trim(name) == trim(self % vars(i) % name)) then
+                var = self % vars(i)
+                found_var = .true.
+            end if
         end do
 
-        if (varid == -1) then
+        if (.not. found_var) then
             write (log_str, '(a)') 'Unknown variable `' // trim(name) // '`.'
-            call logger % fatal('put_timeslice', log_str)
+            call logger % fatal('write_var', log_str)
             call abort_now()
         end if
 
-        status = nf90_put_var(                          &
-            self % ncid, varid, data,                   &
-            start = [ 1, 1, self % tidx ],              &
-            count = [ size(data, 1), size(data, 2), 1 ] )
+        if (any(var % dimids == self % tdim)) then
+            status = nf90_put_var(                          &
+                self % ncid, var % varid, data,             &
+                start = [ 1, 1, self % tidx ],              &
+                count = [ size(data, 1), size(data, 2), 1 ] )
+        else
+            status = nf90_put_var(                       &
+                self % ncid, var % varid, data,          &
+                start = [ 1, 1 ],                        &
+                count = [ size(data, 1), size(data, 2) ] )
+        end if
 
-        call handle_netcdf_error(status, 'put_timeslice')
+        call handle_netcdf_error(status, 'write_var')
 
-    end subroutine put_timeslice
+    end subroutine write_var
 
     subroutine handle_netcdf_error(errcode, source)
         integer(ik), intent(in) :: errcode
