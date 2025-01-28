@@ -68,11 +68,11 @@ contains
             call output_nc % create_var('v', ['t', 'x', 'y'])
 
         end if
-        
+
     end subroutine init_output
 
     subroutine finalise_output()
-        
+
         call output_nc % close()
 
     end subroutine finalise_output
@@ -93,7 +93,7 @@ contains
                 call compensated_sum(dt * .5 * (vd(i,j) + vd(i+1,j)), i, j, V_IDX)
             end do
         end do
-        
+
         accumulation_time = accumulation_time + dt
 
     end subroutine accumulate_output
@@ -164,7 +164,7 @@ contains
         call write(restart_nc, vd(isd:ied, jsd:jed), 'v')
 
         call restart_nc % close()
-        
+
     end subroutine write_restart_file
 
     subroutine write(netcdf, field, name)

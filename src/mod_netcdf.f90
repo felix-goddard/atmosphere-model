@@ -5,7 +5,7 @@ module mod_netcdf
     use mod_log, only: logger => main_logger, log_str
     use mod_config, only: config => main_config
     use mod_util, only: abort_now
-    use netcdf, only: &
+    use netcdf, only:                                                                &
         nf90_open, nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable,      &
         nf90_create, nf90_inq_dimid, nf90_def_dim, nf90_inq_varid, nf90_def_var,     &
         nf90_put_var, nf90_get_var, nf90_enddef, nf90_redef, nf90_close, nf90_float, &
@@ -206,8 +206,6 @@ contains
         integer(ik) :: status, dimid, varid, i
         type(netcdf_axis), allocatable :: axes(:)
         type(netcdf_axis) :: axis
-        ! character(len=:), allocatable :: axis_name(:)
-        ! integer(ik), allocatable :: axis_dimid(:), axis_varid(:)
 
         status = nf90_redef(self % ncid)
         call handle_netcdf_error(status, 'create_axis')
@@ -385,5 +383,5 @@ contains
         end if
 
     end subroutine handle_netcdf_error
-    
+
 end module mod_netcdf

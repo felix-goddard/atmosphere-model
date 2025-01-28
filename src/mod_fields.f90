@@ -17,7 +17,7 @@ module mod_fields
     real(rk), allocatable :: vd(:,:) ! prognostic v wind (on D grid)
 
     public :: h, ud, vd
-    
+
 contains
 
     subroutine init_prognostic_fields()
@@ -40,7 +40,7 @@ contains
                     cycle axis_loop
             end do
             write (log_str, '(a)') 'Could not find axis `' // trim(names(i)) &
-                 // '` in initial condition netCDF.'
+                // '` in initial condition netCDF.'
             call logger % fatal('init_prognostic_fields', log_str)
             call abort_now()
         end do axis_loop
@@ -53,7 +53,7 @@ contains
                     cycle var_loop
             end do
             write (log_str, '(a)') 'Could not find variable `' // trim(names(i)) &
-                 // '` in initial condition netCDF.'
+                // '` in initial condition netCDF.'
             call logger % fatal('init_prognostic_fields', log_str)
             call abort_now()
         end do var_loop
@@ -73,5 +73,5 @@ contains
         call initial_nc % close()
 
     end subroutine init_prognostic_fields
-    
+
 end module mod_fields

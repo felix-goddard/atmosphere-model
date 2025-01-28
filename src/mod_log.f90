@@ -33,7 +33,7 @@ module mod_log
     integer(ik), parameter :: log_warning = 20
     integer(ik), parameter :: log_info = 10
     integer(ik), parameter :: log_debug = 0
-    
+
 contains
 
     subroutine init_logging(output_file, error_file, output_level, error_level)
@@ -54,12 +54,13 @@ contains
         else
             level_2 = log_error
         end if
-        
+
         open (newunit=output_unit, file=output_file, status='replace')
         open (newunit=error_unit, file=error_file, status='replace')
 
-        main_logger = Logger(level_1, level_2,      &
-                             output_unit, error_unit)
+        main_logger = Logger(level_1, level_2, &
+            output_unit, error_unit)
+
     end subroutine init_logging
 
     subroutine handle_message(self, level, message)
@@ -70,7 +71,7 @@ contains
 
         call date_and_time(values=datetime)
 
-        write(log_str, '(a,i4,2(a,i2.2),3(a,i2.2),a,i3.3,2a)')           &
+        write(log_str, '(a,i4,2(a,i2.2),3(a,i2.2),a,i3.3,2a)')    &
             '[', datetime(1), '-', datetime(2), '-', datetime(3), &
             ' ', datetime(5), ':', datetime(6), ':', datetime(7), &
             '.', datetime(8), '] ', trim(message)
@@ -92,42 +93,52 @@ contains
                 flush (stdout)
             end if
         end if
+
     end subroutine handle_message
 
     subroutine fatal(self, source, message)
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: source, message
+
         call self % handle_message(                                  &
             log_fatal, '[' // source // '] <fatal> ' // trim(message))
+
     end subroutine fatal
 
     subroutine error(self, source, message)
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: source, message
+
         call self % handle_message(                                  &
             log_error, '[' // source // '] <error> ' // trim(message))
+
     end subroutine error
 
     subroutine warning(self, source, message)
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: source, message
+
         call self % handle_message(                                      &
             log_warning, '[' // source // '] <warning> ' // trim(message))
+
     end subroutine warning
 
     subroutine info(self, source, message)
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: source, message
+
         call self % handle_message(                                &
             log_info, '[' // source // '] <info> ' // trim(message))
+
     end subroutine info
 
     subroutine debug(self, source, message)
         class(Logger), intent(in out) :: self
         character(*), intent(in) :: source, message
+
         call self % handle_message(                                  &
             log_debug, '[' // source // '] <debug> ' // trim(message))
+
     end subroutine debug
 
-    
 end module mod_log

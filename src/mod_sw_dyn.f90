@@ -54,7 +54,7 @@ module mod_sw_dyn
 
     integer(ik), parameter :: PPM_UNCONSTRAINED = 0
     integer(ik), parameter :: PPM_CONSTRAINED = 1
-        
+
 contains
 
     function is_stable()
@@ -63,7 +63,7 @@ contains
         is_stable = (all(ieee_is_finite(h(isd:ied, jsd:jed))) &
             .and. all(ieee_is_finite(ud(isd:ied, jsd:jed)))   &
             .and. all(ieee_is_finite(vd(isd:ied, jsd:jed))))
-        
+
     end function is_stable
 
     subroutine sw_dynamics_step(dt)
@@ -110,7 +110,7 @@ contains
         do i = is+2, ie-2
             courant(js+1:je-1) = dt2dy * vc(i,js+1:je-1)
             call ppm_flux(fy(js+1:je-1), h(i,js+1:je-1), courant(js+1:je-1), &
-                          js+1, je-1, variant=PPM_UNCONSTRAINED)
+                js+1, je-1, variant=PPM_UNCONSTRAINED)
 
             do j = js+4, je-4
                 tmp(i,j) = .5 * (h(i,j) + denom_y(i,j) * (h(i,j) - rA * (fy(j+1) - fy(j))))
@@ -121,7 +121,7 @@ contains
         do j = js+5, je-5
             courant(is+2:ie-2) = dt2dx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_UNCONSTRAINED)
+                is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
             do i = is+5, ie-5
                 hc(i,j) = h(i,j) - (fx(i+1) * courant(i+1) - fx(i) * courant(i))
@@ -132,19 +132,19 @@ contains
         do j = js+2, je-2
             courant(is+2:ie-2) = dt2dx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), h(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_UNCONSTRAINED)
+                is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
             do i = is+4, ie-4
                 tmp(i,j) = .5 * (h(i,j) + denom_x(i,j) * (h(i,j) - rA * (fx(i+1) - fx(i))))
             end do
         end do
-        
+
         ! calculate the outer step in the y-direction
         do i = is+5, ie-5
             courant(js+2:je-2) = dt2dy * vc(i,js+2:je-2)
 
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
-                          js+2, je-2, variant=PPM_UNCONSTRAINED)
+                js+2, je-2, variant=PPM_UNCONSTRAINED)
 
             do j = js+5, je-5
                 hc(i,j) = hc(i,j) - (fy(j+1) * courant(j+1) - fy(j) * courant(j))
@@ -157,13 +157,13 @@ contains
         do i = is+2, ie-2
             courant(js+1:je-1) = dt2dy * va(i,js+1:je-1)
             call ppm_flux(fy(js+1:je-1), vc(i,js+1:je-1), courant(js+1:je-1), &
-                          js+1, je-1, variant=PPM_UNCONSTRAINED)
+                js+1, je-1, variant=PPM_UNCONSTRAINED)
         end do
 
         do j = js+2, je-2
             courant(is+1:ie-1) = dt2dx * ua(is+1:ie-1,j)
             call ppm_flux(fx(is+1:ie-1), uc(is+1:ie-1,j), courant(is+1:ie-1), &
-                          is+1, ie-1, variant=PPM_UNCONSTRAINED)
+                is+1, ie-1, variant=PPM_UNCONSTRAINED)
         end do
 
         do concurrent (i=is+3:ie-3, j=js+3:je-3)
@@ -183,7 +183,7 @@ contains
         do j = js+2, je-2
             courant(is+2:ie-2) = dt2dx * ub(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), vorticity(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_UNCONSTRAINED)
+                is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
             do i = is+4, ie-4
                 tmp(i,j) = .5 * (vorticity(i,j) + &
@@ -194,8 +194,8 @@ contains
         do i = is+6, ie-6
             courant(js+2:je-2) = dt2dy * vd(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
-                          js+2, je-2, variant=PPM_UNCONSTRAINED)
-            
+                js+2, je-2, variant=PPM_UNCONSTRAINED)
+
             do j = js+6, je-6
                 uc(i,j) = uc(i,j)                         &
                     + dt2 * vd(i,j) * fy(j+1)             &
@@ -210,7 +210,7 @@ contains
         do i = is+2, ie-2
             courant(js+2:je-2) = dt2dy * vb(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), vorticity(i,js+2:je-2), courant(js+2:je-2), &
-                          js+2, je-2, variant=PPM_UNCONSTRAINED)
+                js+2, je-2, variant=PPM_UNCONSTRAINED)
 
             do j = js+4, je-4
                 tmp(i,j) = .5 * (vorticity(i,j) + &
@@ -221,8 +221,8 @@ contains
         do j = js+6, je-6
             courant(is+2:ie-2) = dt2dx * ud(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_UNCONSTRAINED)
-            
+                is+2, ie-2, variant=PPM_UNCONSTRAINED)
+
             do i = is+6, ie-6
                 vc(i,j) = vc(i,j)                         &
                     - dt2 * ud(i,j) * fx(i+1)             &
@@ -252,7 +252,7 @@ contains
         do i = is+2, ie-2
             courant(js+1:je-1) = dtdy * va(i,js+1:je-1)
             call ppm_flux(fy(js+1:je-1), h(i,js+1:je-1), courant(js+1:je-1), &
-                          js+1, je-1, variant=PPM_CONSTRAINED)
+                js+1, je-1, variant=PPM_CONSTRAINED)
 
             do j = js+4, je-4
                 tmp(i,j) = .5 * (h(i,j) + &
@@ -264,7 +264,7 @@ contains
         do j = js+5, je-5
             courant(is+2:ie-2) = dtdx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_CONSTRAINED)
+                is+2, ie-2, variant=PPM_CONSTRAINED)
 
             do i = is+5, ie-5
                 hc(i,j) = h(i,j) - (fx(i+1) * courant(i+1) - fx(i) * courant(i))
@@ -275,19 +275,19 @@ contains
         do j = js+2, je-2
             courant(is+2:ie-2) = dtdx * ua(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), h(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_CONSTRAINED)
+                is+2, ie-2, variant=PPM_CONSTRAINED)
 
             do i = is+4, ie-4
                 tmp(i,j) = .5 * (h(i,j) + &
                     denom_x(i,j) * (h(i,j) - rA * (fx(i+1) - fx(i))))
             end do
         end do
-        
+
         ! calculate the outer step in the y-direction
         do i = is+5, ie-5
             courant(js+2:je-2) = dtdy * vc(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
-                          js+2, je-2, variant=PPM_CONSTRAINED)
+                js+2, je-2, variant=PPM_CONSTRAINED)
 
             do j = js+5, je-5
                 hc(i,j) = hc(i,j) - (fy(j+1) * courant(j+1) - fy(j) * courant(j))
@@ -302,13 +302,13 @@ contains
         do i = is+2, ie-2
             courant(js+1:je-1) = dtdy * vb(i,js+1:je-1)
             call ppm_flux(kinetic_energy(i,js+1:je-1), vd(i,js+1:je-1), courant(js+1:je-1), &
-                          js+1, je-1, variant=PPM_CONSTRAINED)
+                js+1, je-1, variant=PPM_CONSTRAINED)
         end do
 
         do j = js+2, je-2
             courant(is+1:ie-1) = dtdx * ub(is+1:ie-1,j)
             call ppm_flux(fx(is+1:ie-1), ud(is+1:ie-1,j), courant(is+1:ie-1), &
-                          is+1, ie-1, variant=PPM_CONSTRAINED)
+                is+1, ie-1, variant=PPM_CONSTRAINED)
 
             kinetic_energy(is+1:ie-1,j) = .5 * ( &
                 ub(is+1:ie-1,j) * fx(is+1:ie-1) &
@@ -331,7 +331,7 @@ contains
         do j = js+2, je-2
             courant(is+2:ie-2) = dtdx * ua(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), vorticity(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_CONSTRAINED)
+                is+2, ie-2, variant=PPM_CONSTRAINED)
 
             do i = is+4, ie-4
                 tmp(i,j) = .5 * (vorticity(i,j) + &
@@ -342,8 +342,8 @@ contains
         do i = is+6, ie-6
             courant(js+2:je-2) = dtdy * vc(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
-                          is+2, ie-2, variant=PPM_CONSTRAINED)
-            
+                is+2, ie-2, variant=PPM_CONSTRAINED)
+
             do j = js+6, je-6
                 ud(i,j) = ud(i,j)                        &
                     + dt * vc(i,j) * fy(j)               &
@@ -358,7 +358,7 @@ contains
         do i = is+2, ie-2
             courant(js+2:je-2) = dtdy * va(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), vorticity(i,js+2:je-2), courant(js+2:je-2), &
-                          js+2, je-2, variant=PPM_CONSTRAINED)
+                js+2, je-2, variant=PPM_CONSTRAINED)
 
             do j = js+4, je-4
                 tmp(i,j) = .5 * (vorticity(i,j) + &
@@ -369,15 +369,15 @@ contains
         do j = js+6, je-6
             courant(is+2:ie-2) = dtdx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
-                          is+2, ie-2, variant=PPM_CONSTRAINED)
-            
+                is+2, ie-2, variant=PPM_CONSTRAINED)
+
             do i = is+6, ie-6
                 vd(i,j) = vd(i,j)                        &
                     - dt * uc(i,j) * fx(i)               &
                     - dtdy * (energy(i,j+1) - energy(i,j))
             end do
         end do
-        
+
     end subroutine sw_dynamics_step
 
     subroutine ppm_flux(f, q, c, isl, iel, variant)
@@ -408,7 +408,7 @@ contains
                 f(i) = q(i) + k1 * edge_L(i) + k2 * edge_R(i)
             end if
         end do
-        
+
     end subroutine ppm_flux
 
     subroutine ppm(q, isl, iel, variant)
@@ -456,7 +456,7 @@ contains
             call logger % fatal('ppm', log_str)
             call abort_now()
         end if
-        
+
     end subroutine ppm
 
     subroutine allocate_sw_dyn_arrays()
@@ -482,7 +482,7 @@ contains
 
         if (.not. allocated(edge_L)) allocate(edge_L(min(is,js):max(ie,je)))
         if (.not. allocated(edge_R)) allocate(edge_R(min(is,js):max(ie,je)))
-        
+
     end subroutine allocate_sw_dyn_arrays
-    
+
 end module mod_sw_dyn

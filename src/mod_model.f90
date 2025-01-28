@@ -19,7 +19,7 @@ module mod_model
     logical :: write_this_step, stable
 
 contains
-    
+
     subroutine init_model()
 
         call init_tiles()
@@ -67,7 +67,7 @@ contains
 
             n = n + 1
             dt = calculate_dt(time)
-  
+
             if (this_image() == 1) then
                 write (log_str, '(a,i6,a,f6.2)') 'Computing time step ', n, ' with dt=', dt
                 call logger % info('run_model', log_str)
@@ -106,7 +106,7 @@ contains
                 previous_write_time = time
                 write_this_step = .false.
             end if
-        
+
         end do main_loop
 
         if (config % save_restart_file) then
@@ -127,13 +127,15 @@ contains
             dt = previous_write_time + config % dt_output - time
             write_this_step = .true.
         end if
-        
+
     end function calculate_dt
 
     pure function and_func(a, b) result(res)
         logical, intent(in) :: a, b
         logical :: res
+
         res = a .and. b
+
     end function and_func
 
 end module mod_model

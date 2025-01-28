@@ -3,7 +3,7 @@ module mod_sync
     use mod_kinds, only: ik, rk
     use mod_config, only: config => main_config
     use mod_tiles, only: neighbours, &
-                         is, ie, js, je, isd, ied, jsd, jed, halo_width
+        is, ie, js, je, isd, ied, jsd, jed, halo_width
     use mod_fields, only: h, ud, vd
     use mod_util, only: set
 
@@ -29,7 +29,7 @@ module mod_sync
     ! - across-boundary direction (1:halo_width)
     ! - neighbour tile (1:4)
     ! - variable (1:n_prognostics)
-    
+
 contains
 
     subroutine halo_exchange()
@@ -45,7 +45,7 @@ contains
         call copy_from_buffer(h,  1)
         call copy_from_buffer(ud, 2)
         call copy_from_buffer(vd, 3)
-        
+
     end subroutine halo_exchange
 
     subroutine copy_to_buffer(q, idx)
@@ -71,7 +71,7 @@ contains
         real(rk), intent(inout) :: q(is:ie,js:je)
         integer(ik), intent(in) :: idx
         integer(ik) :: i
-        
+
         do i = 1, halo_width
             q(isd-i, jsd:jed) = edge_buffer(jsd:jed, i, 2, idx) ! left neighbour
             q(ied+i, jsd:jed) = edge_buffer(jsd:jed, i, 1, idx) ! right neighbour
@@ -88,14 +88,14 @@ contains
 
     subroutine allocate_sync_buffers()
 
-        if (.not. allocated(edge_buffer)) &
-            allocate(edge_buffer(                &
-                1:max(config % nx, config % ny), &
-                halo_width, 4, n_prognostics)[*] )
+        if (.not. allocated(edge_buffer))    &
+            allocate(edge_buffer(            &
+            1:max(config % nx, config % ny), &
+            halo_width, 4, n_prognostics)[*] )
 
         if (.not. allocated(corner_buffer)) &
             allocate(corner_buffer(halo_width, halo_width, 4, n_prognostics)[*])
-        
+
     end subroutine allocate_sync_buffers
 
 end module mod_sync

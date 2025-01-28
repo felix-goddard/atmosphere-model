@@ -7,7 +7,7 @@ module mod_util
 
     private
     public :: abort_now, set, parse_duration
-    
+
 contains
 
     subroutine abort_now()
@@ -15,7 +15,7 @@ contains
         close (unit=logger % output_unit)
         close (unit=logger % error_unit)
         stop 'Aborted'
-        
+
     end subroutine abort_now
 
     pure recursive function set(a) result(res)
@@ -27,6 +27,7 @@ contains
         else
             res = a
         end if
+
     end function set
 
     function parse_duration(duration_str) result(duration)
@@ -141,7 +142,7 @@ contains
         end if
 
         duration = (               &
-              31536000. * n_year   &
+            31536000. * n_year     &
             +  2592000. * n_month  &
             +   604800. * n_week   &
             +    86400. * n_day    &
@@ -150,7 +151,7 @@ contains
             +        1. * n_second )
         return
 
-        10 write (log_str, '(a)') 'Could not read ISO8601 duration `' // duration_str // '`'
+10      write (log_str, '(a)') 'Could not read ISO8601 duration `' // duration_str // '`'
         call logger % fatal('parse_duration', log_str)
         call abort_now()
 
@@ -165,8 +166,8 @@ contains
         read (s, trim(format_str), err=10) res
         return
 
-        10 res = -1
-        
+10      res = -1
+
     end function read_real
-    
+
 end module mod_util

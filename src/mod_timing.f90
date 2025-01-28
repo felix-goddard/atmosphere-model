@@ -1,26 +1,27 @@
 module mod_timing
 
-   use mod_kinds, only: ik, rk
-   use mod_log, only: logger => main_logger, log_str
+    use mod_kinds, only: ik, rk
+    use mod_log, only: logger => main_logger, log_str
 
-   implicit none
+    implicit none
 
-   private
-   public :: timing_on, timing_off, init_timing, print_timing
+    private
+    public :: timing_on, timing_off, init_timing, print_timing
 
-   integer(ik), parameter :: max_blocks = 100
-   integer(ik), parameter :: max_label_length = 20
-   integer(ik) :: n_blocks = 0
+    integer(ik), parameter :: max_blocks = 100
+    integer(ik), parameter :: max_label_length = 20
+    integer(ik) :: n_blocks = 0
 
-   integer(ik) :: n_times(max_blocks)
+    integer(ik) :: n_times(max_blocks)
 
-   real(rk) :: usr_total_time(max_blocks)
-   real(rk) :: usr_start_time(max_blocks)
+    real(rk) :: usr_total_time(max_blocks)
+    real(rk) :: usr_start_time(max_blocks)
 
-   real(rk) :: sys_total_time(max_blocks)
-   real(rk) :: sys_start_time(max_blocks)
+    real(rk) :: sys_total_time(max_blocks)
+    real(rk) :: sys_start_time(max_blocks)
 
-   character(len=max_label_length) :: labels(max_blocks)
+    character(len=max_label_length) :: labels(max_blocks)
+
 contains
 
     subroutine init_timing()
@@ -48,6 +49,7 @@ contains
             labels(n_blocks) = trim(label)
             idx = n_blocks
         end if
+
     end function
 
     subroutine timing_on(label)
@@ -77,7 +79,7 @@ contains
             call logger % warning('timing_off', log_str)
             return
         end if
-        
+
         n_times(idx) = n_times(idx) + 1
         usr_total_time(idx) = usr_total_time(idx) + (times(1) - usr_start_time(idx))
         sys_total_time(idx) = sys_total_time(idx) + (times(2) - sys_start_time(idx))
@@ -91,7 +93,7 @@ contains
 
         nl = new_line('a')
 
-        write (log_str, '(a)') 'Timing information.' // nl &
+        write (log_str, '(a)') 'Timing information.' // nl                       &
             // 'Block                  n      User       Sys        Total' // nl &
             // '------------------------------------------------------------'
 
@@ -110,7 +112,7 @@ contains
         end do
 
         call logger % info('print_timing', log_str)
-        
+
     end subroutine print_timing
 
 end module mod_timing
