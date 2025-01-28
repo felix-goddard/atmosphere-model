@@ -82,10 +82,6 @@ contains
         n = 0
         time = config % t_initial
 
-        ! Write the initial state
-        call accumulate_output(1._rk)
-        call write_output(time)
-
         main_loop: do while (time < config % t_final)
 
             n = n + 1
