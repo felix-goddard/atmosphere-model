@@ -8,7 +8,8 @@ module mod_model
     use mod_input, only: read_initial_file
     use mod_tiles, only: init_tiles
     use mod_fields, only: init_prognostic_fields
-    use mod_sw_dyn, only: allocate_sw_dyn_arrays, sw_dynamics_step, is_stable
+    use mod_sw_dyn, only: allocate_sw_dyn_arrays, cgrid_dynamics_step, &
+                          dgrid_dynamics_step, is_stable
     use mod_sync, only: halo_exchange, allocate_sync_buffers
     use mod_output, only: accumulate_output, write_output, write_restart_file
 
@@ -92,9 +93,13 @@ contains
                 call logger % info('run_model', log_str)
             end if
 
-            call timing_on('SW DYNAMICS')
-            call sw_dynamics_step(dt)
-            call timing_off('SW DYNAMICS')
+            call timing_on('CGRID DYNAMICS')
+            call cgrid_dynamics_step(dt / 2.)
+            call timing_off('CGRID DYNAMICS')
+
+            call timing_on('DGRID DYNAMICS')
+            call dgrid_dynamics_step(dt)
+            call timing_off('DGRID DYNAMICS')
 
             stable = is_stable()
 

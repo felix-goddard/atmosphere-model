@@ -11,7 +11,7 @@ module mod_sw_dyn
     implicit none
     private
 
-    public :: sw_dynamics_step, allocate_sw_dyn_arrays, is_stable
+    public :: cgrid_dynamics_step, dgrid_dynamics_step, allocate_sw_dyn_arrays, is_stable
 
     real(rk), allocatable :: hc(:,:) ! height for the C grid half-step
 
@@ -50,6 +50,7 @@ module mod_sw_dyn
     real(rk), allocatable :: tmp(:,:)
 
     real(rk), allocatable :: fx(:), fy(:), courant(:)
+    real(rk), allocatable :: denom_x(:,:), denom_y(:,:)
     real(rk), allocatable :: edge_L(:), edge_R(:) ! values calculated by the PPM
 
     integer(ik), parameter :: PPM_UNCONSTRAINED = 0
@@ -66,25 +67,14 @@ contains
 
     end function is_stable
 
-    subroutine sw_dynamics_step(dt)
-        ! Solve the shallow water equations following the method of Lin & Rood (1997)
-        ! (i.e. on the CD grid using the finite-volume multidimensional transport scheme
-        ! of Lin & Rood (1996)).
-
+    subroutine cgrid_dynamics_step(dt)
         real(rk), intent(in) :: dt
         integer(ik) :: i, j
-        real(rk) :: dx, dy, dtdx, dtdy, dt2, dt2dx, dt2dy, rA
-        real(rk) :: denom_x(is:ie, js:je), denom_y(is:ie, js:je)
+        real(rk) :: dtdx, dtdy, rA
 
-        dx = config % dx
-        dy = config % dy
-        dtdx = dt / dx
-        dtdy = dt / dy
-        dt2 = dt / 2.
-        dt2dx = dt2 / dx
-        dt2dy = dt2 / dy
-
-        rA = 1. / (dx * dy)
+        dtdx = dt / config % dx
+        dtdy = dt / config % dy
+        rA = 1. / (config % dx * config % dy)
 
         ! Calculate the winds
         do concurrent (i=is+1:ie-1, j=js+1:je-1)
@@ -99,16 +89,16 @@ contains
         end do
 
         ! ===========================================================================
-        ! Half-step for calculating C grid h
+        ! Calculate height field update from the C grid winds (`hc`)
 
         do concurrent (i=is+2:ie-2, j=js+2:je-2)
-            denom_x(i,j) = 1. / (1. - dt2dx * (uc(i+1,j) - uc(i,j)))
-            denom_y(i,j) = 1. / (1. - dt2dy * (vc(i,j+1) - vc(i,j)))
+            denom_x(i,j) = 1. / (1. - dtdx * (uc(i+1,j) - uc(i,j)))
+            denom_y(i,j) = 1. / (1. - dtdy * (vc(i,j+1) - vc(i,j)))
         end do
 
         ! calculate the inner step (in the y-direction) for the outer x-direction step
         do i = is+2, ie-2
-            courant(js+1:je-1) = dt2dy * vc(i,js+1:je-1)
+            courant(js+1:je-1) = dtdy * vc(i,js+1:je-1)
             call ppm_flux(fy(js+1:je-1), h(i,js+1:je-1), courant(js+1:je-1), &
                 js+1, je-1, variant=PPM_UNCONSTRAINED)
 
@@ -119,7 +109,7 @@ contains
 
         ! calculate the outer step in the x-direction
         do j = js+5, je-5
-            courant(is+2:ie-2) = dt2dx * uc(is+2:ie-2,j)
+            courant(is+2:ie-2) = dtdx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
                 is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
@@ -130,7 +120,7 @@ contains
 
         ! calculate the inner step (in the x-direction) for the outer y-direction step
         do j = js+2, je-2
-            courant(is+2:ie-2) = dt2dx * uc(is+2:ie-2,j)
+            courant(is+2:ie-2) = dtdx * uc(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), h(is+2:ie-2,j), courant(is+2:ie-2), &
                 is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
@@ -141,7 +131,7 @@ contains
 
         ! calculate the outer step in the y-direction
         do i = is+5, ie-5
-            courant(js+2:je-2) = dt2dy * vc(i,js+2:je-2)
+            courant(js+2:je-2) = dtdy * vc(i,js+2:je-2)
 
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
                 js+2, je-2, variant=PPM_UNCONSTRAINED)
@@ -155,21 +145,21 @@ contains
         ! Energy and vorticity
 
         do i = is+2, ie-2
-            courant(js+1:je-1) = dt2dy * va(i,js+1:je-1)
+            courant(js+1:je-1) = dtdy * va(i,js+1:je-1)
             call ppm_flux(fy(js+1:je-1), vc(i,js+1:je-1), courant(js+1:je-1), &
                 js+1, je-1, variant=PPM_UNCONSTRAINED)
         end do
 
         do j = js+2, je-2
-            courant(is+1:ie-1) = dt2dx * ua(is+1:ie-1,j)
+            courant(is+1:ie-1) = dtdx * ua(is+1:ie-1,j)
             call ppm_flux(fx(is+1:ie-1), uc(is+1:ie-1,j), courant(is+1:ie-1), &
                 is+1, ie-1, variant=PPM_UNCONSTRAINED)
         end do
 
         do concurrent (i=is+3:ie-3, j=js+3:je-3)
-            vorticity(i,j) = config % coriolis &
-                - (uc(i,j) - uc(i,j-1)) / dy   &
-                + (vc(i,j) - vc(i-1,j)) / dx
+            vorticity(i,j) = config % coriolis        &
+                - (uc(i,j) - uc(i,j-1)) / config % dy &
+                + (vc(i,j) - vc(i-1,j)) / config % dx
 
             kinetic_energy(i,j) = .5 * (ua(i,j) * fx(i+1) + va(i,j) * fy(j+1))
 
@@ -177,11 +167,11 @@ contains
         end do
 
         ! ===========================================================================
-        ! Half-step for calculating C grid u
+        ! Calculate C grid u (`uc`)
 
         ! calculate the inner step (in the x-direction) for the outer y-direction step
         do j = js+2, je-2
-            courant(is+2:ie-2) = dt2dx * ub(is+2:ie-2,j)
+            courant(is+2:ie-2) = dtdx * ub(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), vorticity(is+2:ie-2,j), courant(is+2:ie-2), &
                 is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
@@ -192,23 +182,23 @@ contains
         end do
 
         do i = is+6, ie-6
-            courant(js+2:je-2) = dt2dy * vd(i,js+2:je-2)
+            courant(js+2:je-2) = dtdy * vd(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), tmp(i,js+2:je-2), courant(js+2:je-2), &
                 js+2, je-2, variant=PPM_UNCONSTRAINED)
 
             do j = js+6, je-6
-                uc(i,j) = uc(i,j)                         &
-                    + dt2 * vd(i,j) * fy(j+1)             &
-                    - dt2dx * (energy(i,j) - energy(i-1,j))
+                uc(i,j) = uc(i,j)                        &
+                    + dt * vd(i,j) * fy(j+1)             &
+                    - dtdx * (energy(i,j) - energy(i-1,j))
             end do
         end do
 
         ! ===========================================================================
-        ! Half-step for calculating C grid v
+        ! Calculate C grid v (`vc`)
 
         ! calculate the inner step (in the y-direction) for the outer x-direction step
         do i = is+2, ie-2
-            courant(js+2:je-2) = dt2dy * vb(i,js+2:je-2)
+            courant(js+2:je-2) = dtdy * vb(i,js+2:je-2)
             call ppm_flux(fy(js+2:je-2), vorticity(i,js+2:je-2), courant(js+2:je-2), &
                 js+2, je-2, variant=PPM_UNCONSTRAINED)
 
@@ -219,16 +209,27 @@ contains
         end do
 
         do j = js+6, je-6
-            courant(is+2:ie-2) = dt2dx * ud(is+2:ie-2,j)
+            courant(is+2:ie-2) = dtdx * ud(is+2:ie-2,j)
             call ppm_flux(fx(is+2:ie-2), tmp(is+2:ie-2,j), courant(is+2:ie-2), &
                 is+2, ie-2, variant=PPM_UNCONSTRAINED)
 
             do i = is+6, ie-6
-                vc(i,j) = vc(i,j)                         &
-                    - dt2 * ud(i,j) * fx(i+1)             &
-                    - dt2dy * (energy(i,j) - energy(i,j-1))
+                vc(i,j) = vc(i,j)                        &
+                    - dt * ud(i,j) * fx(i+1)             &
+                    - dtdy * (energy(i,j) - energy(i,j-1))
             end do
         end do
+
+    end subroutine cgrid_dynamics_step
+
+    subroutine dgrid_dynamics_step(dt)
+        real(rk), intent(in) :: dt
+        integer(ik) :: i, j
+        real(rk) :: dtdx, dtdy, rA
+
+        dtdx = dt / config % dx
+        dtdy = dt / config % dy
+        rA = 1. / (config % dx * config % dy)
 
         ! Update the other winds based on the new C grid winds; since uc and vc
         ! get updated on is/js+6 to ie/je-6 we can only calculate these on is+7 to ie-7
@@ -246,7 +247,7 @@ contains
         end do
 
         ! ===========================================================================
-        ! Prognostic step for calculating h
+        ! Update the prognostic h field
 
         ! calculate the inner step (in the y-direction) for the outer x-direction step
         do i = is+2, ie-2
@@ -316,16 +317,16 @@ contains
         end do
 
         do concurrent (i=is+3:ie-3, j=js+3:je-3)
-            vorticity(i,j) = config % coriolis &
-                - (ud(i,j+1) - ud(i,j)) / dy   &
-                + (vd(i+1,j) - vd(i,j)) / dx
+            vorticity(i,j) = config % coriolis        &
+                - (ud(i,j+1) - ud(i,j)) / config % dy &
+                + (vd(i+1,j) - vd(i,j)) / config % dx
 
             energy(i,j) = kinetic_energy(i,j) + config % gravity * ( &
                 h(i,j) + h(i-1,j) + h(i,j-1) + h(i-1,j-1) ) / 4.
         end do
 
         ! ===========================================================================
-        ! Prognostic for calculating u
+        ! Update the prognostic D grid u (`ud`)
 
         ! calculate the inner step (in the x-direction) for the outer y-direction step
         do j = js+2, je-2
@@ -352,7 +353,7 @@ contains
         end do
 
         ! ===========================================================================
-        ! Prognostic for calculating v
+        ! Update the prognostic D grid v (`vd`)
 
         ! calculate the inner step (in the y-direction) for the outer x-direction step
         do i = is+2, ie-2
@@ -378,7 +379,7 @@ contains
             end do
         end do
 
-    end subroutine sw_dynamics_step
+    end subroutine dgrid_dynamics_step
 
     subroutine ppm_flux(f, q, c, isl, iel, variant)
         ! Calculate numerical fluxes of q given an array of Courant numbers c, assuming
@@ -479,6 +480,8 @@ contains
         if (.not. allocated(fx))      allocate(fx(min(is,js):max(ie,je)))
         if (.not. allocated(fy))      allocate(fy(min(is,js):max(ie,je)))
         if (.not. allocated(courant)) allocate(courant(min(is,js):max(ie,je)))
+        if (.not. allocated(denom_x)) allocate(denom_x(is:ie, js:je))
+        if (.not. allocated(denom_y)) allocate(denom_y(is:ie, js:je))
 
         if (.not. allocated(edge_L)) allocate(edge_L(min(is,js):max(ie,je)))
         if (.not. allocated(edge_R)) allocate(edge_R(min(is,js):max(ie,je)))
