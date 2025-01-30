@@ -7,7 +7,7 @@ module mod_tiles
 
    private
    public :: init_tiles, neighbours, &
-      is, ie, js, je, isd, ied, jsd, jed, halo_width
+             is, ie, js, je, isd, ied, jsd, jed, halo_width
 
    integer(ik), parameter :: halo_width = 12
    integer(ik) :: is, ie, js, je ! data bounds (including halo)
@@ -47,7 +47,7 @@ contains
 
       num_tiles = [1, n]
       do i = 1, size(divs)
-         dim1 = n / divs(i)
+         dim1 = n/divs(i)
          dim2 = divs(i)
          if (dim1 + dim2 < num_tiles(1) + num_tiles(2)) then
             num_tiles = [dim1, dim2]
@@ -64,10 +64,10 @@ contains
       integer(ik) :: indices(2)
       integer(ik) :: offset, tile_size
 
-      tile_size = dims / n
+      tile_size = dims/n
 
       ! start and end indices assuming equal tile sizes
-      indices(1) = (i - 1) * tile_size + 1
+      indices(1) = (i - 1)*tile_size + 1
       indices(2) = indices(1) + tile_size - 1
 
       ! if we have any remainder, distribute it to the tiles at the end
@@ -78,7 +78,6 @@ contains
       end if
 
    end function tile_indices_1d
-
 
    pure function tile_indices_2d(dims) result(indices)
       ! Given an input x- and y- dimensions of the total computational domain [im, jm].
@@ -94,7 +93,6 @@ contains
       indices(3:4) = tile_indices_1d(dims(2), tiles_ij(2), tiles(2))
 
    end function tile_indices_2d
-
 
    pure function tile_n2ij(n) result(ij)
       ! Given tile index in a 1-d layout, returns the
@@ -120,13 +118,12 @@ contains
          ij = 0
       else
          tiles = num_tiles(num_images())
-         j = (n - 1) / tiles(1) + 1
-         i = n - (j - 1) * tiles(1)
+         j = (n - 1)/tiles(1) + 1
+         i = n - (j - 1)*tiles(1)
          ij = [i, j]
       end if
 
    end function tile_n2ij
-
 
    pure function tile_ij2n(ij) result(n)
       ! Given tile indices in a 2-d layout, returns the
@@ -152,11 +149,10 @@ contains
          n = 0
       else
          tiles = num_tiles(num_images())
-         n = (ij(2) - 1) * tiles(1) + ij(1)
+         n = (ij(2) - 1)*tiles(1) + ij(1)
       end if
 
    end function tile_ij2n
-
 
    pure function tile_neighbors_2d(periodic) result(neighbors)
       ! Returns the neighbor image indices given.
@@ -165,7 +161,7 @@ contains
       integer(ik) :: neighbors(8)
       integer(ik) :: tiles(2), tiles_ij(2), itile, jtile
       integer(ik) :: ij_L(2), ij_R(2), ij_D(2), ij_U(2), &
-         ij_UL(2), ij_UR(2), ij_DL(2), ij_DR(2)
+                     ij_UL(2), ij_UR(2), ij_DL(2), ij_DR(2)
 
       tiles = num_tiles(num_images())
       tiles_ij = tile_n2ij(this_image())
@@ -215,18 +211,18 @@ contains
       end if
 
       neighbors = [ &
-         tile_ij2n(ij_L), tile_ij2n(ij_R),   &
-         tile_ij2n(ij_D), tile_ij2n(ij_U),   &
-         tile_ij2n(ij_UL), tile_ij2n(ij_UR), &
-         tile_ij2n(ij_DL), tile_ij2n(ij_DR)  &
-         ]
+                  tile_ij2n(ij_L), tile_ij2n(ij_R), &
+                  tile_ij2n(ij_D), tile_ij2n(ij_U), &
+                  tile_ij2n(ij_UL), tile_ij2n(ij_UR), &
+                  tile_ij2n(ij_DL), tile_ij2n(ij_DR) &
+                  ]
 
    end function tile_neighbors_2d
 
    subroutine init_tiles()
       integer(ik) :: indices(4), upper(2), lower(2)
 
-      indices = tile_indices([config % nx, config % ny])
+      indices = tile_indices([config%nx, config%ny])
       lower = indices([1, 3])
       upper = indices([2, 4])
 
