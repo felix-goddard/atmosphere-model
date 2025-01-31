@@ -56,8 +56,9 @@ module mod_sw_dyn
    real(rk), allocatable :: denom_x(:, :), denom_y(:, :)
    real(rk), allocatable :: edge_L(:), edge_R(:) ! values calculated by the PPM
 
-   integer(ik), parameter :: PPM_UNCONSTRAINED = 0
-   integer(ik), parameter :: PPM_CONSTRAINED = 1
+   integer(ik), parameter :: PIECEWISE_CONSTANT = 0
+   integer(ik), parameter :: PPM_UNCONSTRAINED = 1
+   integer(ik), parameter :: PPM_CONSTRAINED = 2
 
 contains
 
@@ -104,9 +105,9 @@ contains
       ! calculate the inner step (in the y-direction) for the outer x-direction step
       do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*vc(i, js + 1:je - 1)
-         call ppm_flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
-                       courant(js + 1:je - 1), js + 1, je - 1, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do j = js + 4, je - 4
             tmp(i, j) = .5*(h(i, j) &
@@ -117,9 +118,9 @@ contains
       ! calculate the outer step in the x-direction
       do j = js + 7, je - 7
          courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
-         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
-                       courant(is + 4:ie - 4), is + 4, ie - 4, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                   courant(is + 4:ie - 4), is + 4, ie - 4, &
+                   variant=PPM_UNCONSTRAINED)
 
          do i = is + 7, ie - 7
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
@@ -129,9 +130,9 @@ contains
       ! calculate the inner step (in the x-direction) for the outer y-direction step
       do j = js + 4, je - 4
          courant(is + 1:ie - 1) = dtdx*uc(is + 1:ie - 1, j)
-         call ppm_flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
-                       courant(is + 1:ie - 1), is + 1, ie - 1, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do i = is + 4, ie - 4
             tmp(i, j) = .5*(h(i, j) &
@@ -142,9 +143,9 @@ contains
       ! calculate the outer step in the y-direction
       do i = is + 7, ie - 7
          courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
-         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
-                       courant(js + 4:je - 4), js + 4, je - 4, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                   courant(js + 4:je - 4), js + 4, je - 4, &
+                   variant=PPM_UNCONSTRAINED)
 
          do j = js + 7, je - 7
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
@@ -156,9 +157,9 @@ contains
 
       do i = is + 4, ie - 4
          courant(js + 5:je - 3) = dtdy*va(i, js + 5:je - 3)
-         call ppm_flux(fy(js + 5:je - 3), vc(i, js + 5:je - 3), &
-                       courant(js + 5:je - 3), js + 5, je - 3, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fy(js + 5:je - 3), vc(i, js + 5:je - 3), &
+                   courant(js + 5:je - 3), js + 5, je - 3, &
+                   variant=PPM_UNCONSTRAINED)
 
          do j = js + 7, je - 7
             kinetic_energy(i, j) = va(i, j)*fy(j + 1)
@@ -167,9 +168,9 @@ contains
 
       do j = js + 4, je - 4
          courant(is + 5:ie - 3) = dtdx*ua(is + 5:ie - 3, j)
-         call ppm_flux(fx(is + 5:ie - 3), uc(is + 5:ie - 3, j), &
-                       courant(is + 5:ie - 3), is + 5, ie - 3, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fx(is + 5:ie - 3), uc(is + 5:ie - 3, j), &
+                   courant(is + 5:ie - 3), is + 5, ie - 3, &
+                   variant=PPM_UNCONSTRAINED)
 
          do i = is + 7, ie - 7
             kinetic_energy(i, j) = &
@@ -193,9 +194,9 @@ contains
       ! calculate the inner step (in the x-direction) for the outer y-direction step
       do j = js + 4, je - 4
          courant(is + 1:ie - 1) = dtdx*ub(is + 1:ie - 1, j)
-         call ppm_flux(fx(is + 1:ie - 1), vorticity(is + 1:ie - 1, j), &
-                       courant(is + 1:ie - 1), is + 1, ie - 1, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fx(is + 1:ie - 1), vorticity(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do i = is + 4, ie - 4
             tmp(i, j) = &
@@ -206,9 +207,9 @@ contains
 
       do i = is + 8, ie - 8
          courant(js + 4:je - 4) = dtdy*vd(i, js + 4:je - 4)
-         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
-                       courant(js + 4:je - 4), js + 4, je - 4, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                   courant(js + 4:je - 4), js + 4, je - 4, &
+                   variant=PPM_UNCONSTRAINED)
 
          do j = js + 8, je - 8
             uc(i, j) = uc(i, j) &
@@ -223,9 +224,9 @@ contains
       ! calculate the inner step (in the y-direction) for the outer x-direction step
       do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*vb(i, js + 1:je - 1)
-         call ppm_flux(fy(js + 1:je - 1), vorticity(i, js + 1:je - 1), &
-                       courant(js + 1:je - 1), js + 1, je - 1, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fy(js + 1:je - 1), vorticity(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do j = js + 4, je - 4
             tmp(i, j) = &
@@ -236,9 +237,9 @@ contains
 
       do j = js + 8, je - 8
          courant(is + 4:ie - 4) = dtdx*ud(is + 4:ie - 4, j)
-         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
-                       courant(is + 4:ie - 4), is + 4, ie - 4, &
-                       variant=PPM_UNCONSTRAINED)
+         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                   courant(is + 4:ie - 4), is + 4, ie - 4, &
+                   variant=PPM_UNCONSTRAINED)
 
          do i = is + 8, ie - 8
             vc(i, j) = vc(i, j) &
@@ -285,9 +286,9 @@ contains
       ! calculate the inner step (in the y-direction) for the outer x-direction step
       do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*va(i, js + 1:je - 1)
-         call ppm_flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
-                       courant(js + 1:je - 1), js + 1, je - 1, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do j = js + 4, je - 4
             tmp(i, j) = .5*(h(i, j) + &
@@ -298,9 +299,9 @@ contains
       ! calculate the outer step in the x-direction
       do j = js + 7, je - 7
          courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
-         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
-                       courant(is + 4:ie - 4), is + 4, ie - 4, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                   courant(is + 4:ie - 4), is + 4, ie - 4, &
+                   variant=PPM_CONSTRAINED)
 
          do i = is + 7, ie - 7
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
@@ -310,9 +311,9 @@ contains
       ! calculate the inner step (in the x-direction) for the outer y-direction step
       do j = js + 4, je - 4
          courant(is + 1:ie - 1) = dtdx*ua(is + 1:ie - 1, j)
-         call ppm_flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
-                       courant(is + 1:ie - 1), is + 1, ie - 1, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+                   variant=PIECEWISE_CONSTANT)
 
          do i = is + 4, ie - 4
             tmp(i, j) = .5*(h(i, j) + &
@@ -323,9 +324,9 @@ contains
       ! calculate the outer step in the y-direction
       do i = is + 7, ie - 7
          courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
-         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
-                       courant(js + 4:je - 4), js + 4, je - 4, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                   courant(js + 4:je - 4), js + 4, je - 4, &
+                   variant=PPM_CONSTRAINED)
 
          do j = js + 7, je - 7
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
@@ -339,9 +340,9 @@ contains
 
       do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*vb(i, js + 1:je - 1)
-         call ppm_flux(fy(js + 1:je - 1), vd(i, js + 1:je - 1), &
-                       courant(js + 1:je - 1), js + 1, je - 1, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fy(js + 1:je - 1), vd(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
+                   variant=PPM_CONSTRAINED)
 
          do j = js + 4, je - 4
             kinetic_energy(i, j) = vb(i, j)*fy(j)
@@ -350,9 +351,9 @@ contains
 
       do j = js + 4, je - 4
          courant(is + 1:ie - 1) = dtdx*ub(is + 1:ie - 1, j)
-         call ppm_flux(fx(is + 1:ie - 1), ud(is + 1:ie - 1, j), &
-                       courant(is + 1:ie - 1), is + 1, ie - 1, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fx(is + 1:ie - 1), ud(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+                   variant=PPM_CONSTRAINED)
 
          do i = is + 4, ie - 4
             kinetic_energy(i, j) = .5*(kinetic_energy(i, j) + ub(i, j)*fx(i))
@@ -377,9 +378,9 @@ contains
       ! calculate the inner step (in the x-direction) for the outer y-direction step
       do j = js + 5, je - 5
          courant(is + 2:ie - 2) = dtdx*ua(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
+                   courant(is + 2:ie - 2), is + 2, ie - 2, &
+                   variant=PIECEWISE_CONSTANT)
 
          do i = is + 5, ie - 5
             tmp(i, j) = &
@@ -390,9 +391,9 @@ contains
 
       do i = is + 5, ie - 5
          courant(js + 5:je - 5) = dtdy*vc(i, js + 5:je - 5)
-         call ppm_flux(fy(js + 5:je - 5), tmp(i, js + 5:je - 5), &
-                       courant(js + 5:je - 5), is + 5, ie - 5, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fy(js + 5:je - 5), tmp(i, js + 5:je - 5), &
+                   courant(js + 5:je - 5), is + 5, ie - 5, &
+                   variant=PPM_CONSTRAINED)
 
          do j = js + 8, je - 8
             ud(i, j) = ud(i, j) &
@@ -407,9 +408,9 @@ contains
       ! calculate the inner step (in the y-direction) for the outer x-direction step
       do i = is + 5, ie - 5
          courant(js + 2:je - 2) = dtdy*va(i, js + 2:je - 2)
-         call ppm_flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), js + 2, je - 2, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
+                   courant(js + 2:je - 2), js + 2, je - 2, &
+                   variant=PIECEWISE_CONSTANT)
 
          do j = js + 5, je - 5
             tmp(i, j) = &
@@ -420,9 +421,9 @@ contains
 
       do j = js + 8, je - 8
          courant(is + 5:ie - 5) = dtdx*uc(is + 5:ie - 5, j)
-         call ppm_flux(fx(is + 5:ie - 5), tmp(is + 5:ie - 5, j), &
-                       courant(is + 5:ie - 5), is + 5, ie - 5, &
-                       variant=PPM_CONSTRAINED)
+         call flux(fx(is + 5:ie - 5), tmp(is + 5:ie - 5, j), &
+                   courant(is + 5:ie - 5), is + 5, ie - 5, &
+                   variant=PPM_CONSTRAINED)
 
          do i = is + 8, ie - 8
             vd(i, j) = vd(i, j) &
@@ -439,7 +440,7 @@ contains
 
    end subroutine dgrid_halo_exchange
 
-   subroutine ppm_flux(f, q, c, isl, iel, variant)
+   subroutine flux(f, q, c, isl, iel, variant)
       ! Calculate numerical fluxes of q given an array of Courant numbers c, assuming
       ! c is defined on points staggered relative to q. This is done by calculating
       ! a piecewise parabolic interpolation of q, and then analytically integrating
@@ -452,23 +453,39 @@ contains
       integer(ik) :: i
       real(rk) :: s, k1, k2
 
-      call ppm(q, isl, iel, variant)
+      if (variant == PPM_UNCONSTRAINED .or. variant == PPM_CONSTRAINED) then
+         call ppm(q, isl, iel, variant)
 
-      ! ppm defines the edges values over isl+2:iel-2 so we can calculate
-      ! fluxes over isl+3:iel-2
-      do i = isl + 3, iel - 2
-         s = abs(c(i))
-         k1 = (1.-2.*s)*(1.-s)
-         k2 = s*(s - 1.)
+         ! ppm defines the edges values over isl+2:iel-2 so we can calculate
+         ! fluxes over isl+3:iel-2
+         do i = isl + 3, iel - 2
+            s = abs(c(i))
+            k1 = (1.-2.*s)*(1.-s)
+            k2 = s*(s - 1.)
 
-         if (c(i) > 0.) then
-            f(i) = q(i - 1) + k1*edge_R(i - 1) + k2*edge_L(i - 1)
-         else
-            f(i) = q(i) + k1*edge_L(i) + k2*edge_R(i)
-         end if
-      end do
+            if (c(i) > 0.) then
+               f(i) = q(i - 1) + k1*edge_R(i - 1) + k2*edge_L(i - 1)
+            else
+               f(i) = q(i) + k1*edge_L(i) + k2*edge_R(i)
+            end if
+         end do
 
-   end subroutine ppm_flux
+      else if (variant == PIECEWISE_CONSTANT) then
+         do i = isl + 1, iel
+            if (c(i) > 0.) then
+               f(i) = q(i - 1)
+            else
+               f(i) = q(i)
+            end if
+         end do
+      
+      else
+         write (log_str, '(a,i4)') 'Unknown numerical flux variant:', variant
+         call logger%fatal('ppm', log_str)
+         call abort_now()
+      end if
+
+   end subroutine flux
 
    subroutine ppm(q, isl, iel, variant)
       ! Calculate, by a piecewise parabolic reconstruction, the left and right cell
