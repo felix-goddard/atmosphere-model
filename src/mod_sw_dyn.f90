@@ -6,13 +6,15 @@ module mod_sw_dyn
    use mod_config, only: config => main_config
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_fields, only: h, ud, vd
+   use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
    implicit none
    private
 
-   public :: cgrid_dynamics_step, dgrid_dynamics_step, &
-             allocate_sw_dyn_arrays, is_stable
+   public :: allocate_sw_dyn_arrays, is_stable, &
+             cgrid_dynamics_step, cgrid_halo_exchange, &
+             dgrid_dynamics_step, dgrid_halo_exchange
 
    real(rk), allocatable :: hc(:, :) ! height for the C grid half-step
 
@@ -100,7 +102,7 @@ contains
       end do
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 2, ie - 2
+      do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*vc(i, js + 1:je - 1)
          call ppm_flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
                        courant(js + 1:je - 1), js + 1, je - 1, &
@@ -113,22 +115,22 @@ contains
       end do
 
       ! calculate the outer step in the x-direction
-      do j = js + 5, je - 5
-         courant(is + 2:ie - 2) = dtdx*uc(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 7, je - 7
+         courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
+         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                       courant(is + 4:ie - 4), is + 4, ie - 4, &
                        variant=PPM_UNCONSTRAINED)
 
-         do i = is + 5, ie - 5
+         do i = is + 7, ie - 7
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
          end do
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 2, je - 2
-         courant(is + 2:ie - 2) = dtdx*uc(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), h(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 4, je - 4
+         courant(is + 1:ie - 1) = dtdx*uc(is + 1:ie - 1, j)
+         call ppm_flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
+                       courant(is + 1:ie - 1), is + 1, ie - 1, &
                        variant=PPM_UNCONSTRAINED)
 
          do i = is + 4, ie - 4
@@ -138,14 +140,13 @@ contains
       end do
 
       ! calculate the outer step in the y-direction
-      do i = is + 5, ie - 5
-         courant(js + 2:je - 2) = dtdy*vc(i, js + 2:je - 2)
-
-         call ppm_flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), js + 2, je - 2, &
+      do i = is + 7, ie - 7
+         courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
+         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                       courant(js + 4:je - 4), js + 4, je - 4, &
                        variant=PPM_UNCONSTRAINED)
 
-         do j = js + 5, je - 5
+         do j = js + 7, je - 7
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
          end do
       end do
@@ -153,27 +154,36 @@ contains
       ! ===========================================================================
       ! Energy and vorticity
 
-      do i = is + 2, ie - 2
-         courant(js + 1:je - 1) = dtdy*va(i, js + 1:je - 1)
-         call ppm_flux(fy(js + 1:je - 1), vc(i, js + 1:je - 1), &
-                       courant(js + 1:je - 1), js + 1, je - 1, &
+      do i = is + 4, ie - 4
+         courant(js + 5:je - 3) = dtdy*va(i, js + 5:je - 3)
+         call ppm_flux(fy(js + 5:je - 3), vc(i, js + 5:je - 3), &
+                       courant(js + 5:je - 3), js + 5, je - 3, &
                        variant=PPM_UNCONSTRAINED)
+
+         do j = js + 7, je - 7
+            kinetic_energy(i, j) = va(i, j)*fy(j + 1)
+         end do
       end do
 
-      do j = js + 2, je - 2
-         courant(is + 1:ie - 1) = dtdx*ua(is + 1:ie - 1, j)
-         call ppm_flux(fx(is + 1:ie - 1), uc(is + 1:ie - 1, j), &
-                       courant(is + 1:ie - 1), is + 1, ie - 1, &
+      do j = js + 4, je - 4
+         courant(is + 5:ie - 3) = dtdx*ua(is + 5:ie - 3, j)
+         call ppm_flux(fx(is + 5:ie - 3), uc(is + 5:ie - 3, j), &
+                       courant(is + 5:ie - 3), is + 5, ie - 3, &
                        variant=PPM_UNCONSTRAINED)
+
+         do i = is + 7, ie - 7
+            kinetic_energy(i, j) = &
+               .5*(kinetic_energy(i, j) + ua(i, j)*fx(i + 1))
+         end do
       end do
 
-      do concurrent(i=is + 3:ie - 3, j=js + 3:je - 3)
+      do concurrent(i=is + 2:ie - 2, j=js + 2:je - 2)
          vorticity(i, j) = config%coriolis &
                            - (uc(i, j) - uc(i, j - 1))/config%dy &
                            + (vc(i, j) - vc(i - 1, j))/config%dx
+      end do
 
-         kinetic_energy(i, j) = .5*(ua(i, j)*fx(i + 1) + va(i, j)*fy(j + 1))
-
+      do concurrent(i=is + 7:ie - 7, j=js + 7:je - 7)
          energy(i, j) = kinetic_energy(i, j) + config%gravity*hc(i, j)
       end do
 
@@ -181,10 +191,10 @@ contains
       ! Calculate C grid u (`uc`)
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 2, je - 2
-         courant(is + 2:ie - 2) = dtdx*ub(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 4, je - 4
+         courant(is + 1:ie - 1) = dtdx*ub(is + 1:ie - 1, j)
+         call ppm_flux(fx(is + 1:ie - 1), vorticity(is + 1:ie - 1, j), &
+                       courant(is + 1:ie - 1), is + 1, ie - 1, &
                        variant=PPM_UNCONSTRAINED)
 
          do i = is + 4, ie - 4
@@ -194,13 +204,13 @@ contains
          end do
       end do
 
-      do i = is + 6, ie - 6
-         courant(js + 2:je - 2) = dtdy*vd(i, js + 2:je - 2)
-         call ppm_flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), js + 2, je - 2, &
+      do i = is + 8, ie - 8
+         courant(js + 4:je - 4) = dtdy*vd(i, js + 4:je - 4)
+         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                       courant(js + 4:je - 4), js + 4, je - 4, &
                        variant=PPM_UNCONSTRAINED)
 
-         do j = js + 6, je - 6
+         do j = js + 8, je - 8
             uc(i, j) = uc(i, j) &
                        + dt*vd(i, j)*fy(j + 1) &
                        - dtdx*(energy(i, j) - energy(i - 1, j))
@@ -211,10 +221,10 @@ contains
       ! Calculate C grid v (`vc`)
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 2, ie - 2
-         courant(js + 2:je - 2) = dtdy*vb(i, js + 2:je - 2)
-         call ppm_flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), js + 2, je - 2, &
+      do i = is + 4, ie - 4
+         courant(js + 1:je - 1) = dtdy*vb(i, js + 1:je - 1)
+         call ppm_flux(fy(js + 1:je - 1), vorticity(i, js + 1:je - 1), &
+                       courant(js + 1:je - 1), js + 1, je - 1, &
                        variant=PPM_UNCONSTRAINED)
 
          do j = js + 4, je - 4
@@ -224,13 +234,13 @@ contains
          end do
       end do
 
-      do j = js + 6, je - 6
-         courant(is + 2:ie - 2) = dtdx*ud(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 8, je - 8
+         courant(is + 4:ie - 4) = dtdx*ud(is + 4:ie - 4, j)
+         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                       courant(is + 4:ie - 4), is + 4, ie - 4, &
                        variant=PPM_UNCONSTRAINED)
 
-         do i = is + 6, ie - 6
+         do i = is + 8, ie - 8
             vc(i, j) = vc(i, j) &
                        - dt*ud(i, j)*fx(i + 1) &
                        - dtdy*(energy(i, j) - energy(i, j - 1))
@@ -238,6 +248,12 @@ contains
       end do
 
    end subroutine cgrid_dynamics_step
+
+   subroutine cgrid_halo_exchange()
+
+      call halo_exchange(hc, uc, vc)
+
+   end subroutine cgrid_halo_exchange
 
    subroutine dgrid_dynamics_step(dt)
       real(rk), intent(in) :: dt
@@ -250,7 +266,7 @@ contains
 
       ! Update the other winds based on the new C grid winds; since uc and vc
       ! get updated on is/js+6 to ie/je-6 we can only calculate these on is+7 to ie-7
-      do concurrent(i=is + 7:ie - 7, j=js + 7:je - 7)
+      do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
          ua(i, j) = .5*(uc(i, j) + uc(i + 1, j))
          va(i, j) = .5*(vc(i, j) + vc(i, j + 1))
 
@@ -267,7 +283,7 @@ contains
       ! Update the prognostic h field
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 2, ie - 2
+      do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*va(i, js + 1:je - 1)
          call ppm_flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
                        courant(js + 1:je - 1), js + 1, je - 1, &
@@ -280,22 +296,22 @@ contains
       end do
 
       ! calculate the outer step in the x-direction
-      do j = js + 5, je - 5
-         courant(is + 2:ie - 2) = dtdx*uc(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 7, je - 7
+         courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
+         call ppm_flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                       courant(is + 4:ie - 4), is + 4, ie - 4, &
                        variant=PPM_CONSTRAINED)
 
-         do i = is + 5, ie - 5
+         do i = is + 7, ie - 7
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
          end do
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 2, je - 2
-         courant(is + 2:ie - 2) = dtdx*ua(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), h(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 4, je - 4
+         courant(is + 1:ie - 1) = dtdx*ua(is + 1:ie - 1, j)
+         call ppm_flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
+                       courant(is + 1:ie - 1), is + 1, ie - 1, &
                        variant=PPM_CONSTRAINED)
 
          do i = is + 4, ie - 4
@@ -305,45 +321,51 @@ contains
       end do
 
       ! calculate the outer step in the y-direction
-      do i = is + 5, ie - 5
-         courant(js + 2:je - 2) = dtdy*vc(i, js + 2:je - 2)
-         call ppm_flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), js + 2, je - 2, &
+      do i = is + 7, ie - 7
+         courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
+         call ppm_flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                       courant(js + 4:je - 4), js + 4, je - 4, &
                        variant=PPM_CONSTRAINED)
 
-         do j = js + 5, je - 5
+         do j = js + 7, je - 7
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
          end do
       end do
 
-      h(is + 9:ie - 9, js + 9:je - 9) = hc(is + 9:ie - 9, js + 9:je - 9)
+      h(is + 7:ie - 7, js + 7:je - 7) = hc(is + 7:ie - 7, js + 7:je - 7)
 
       ! ===========================================================================
       ! Energy and vorticity
 
-      do i = is + 2, ie - 2
+      do i = is + 4, ie - 4
          courant(js + 1:je - 1) = dtdy*vb(i, js + 1:je - 1)
-         call ppm_flux(kinetic_energy(i, js + 1:je - 1), vd(i, js + 1:je - 1), &
+         call ppm_flux(fy(js + 1:je - 1), vd(i, js + 1:je - 1), &
                        courant(js + 1:je - 1), js + 1, je - 1, &
                        variant=PPM_CONSTRAINED)
+
+         do j = js + 4, je - 4
+            kinetic_energy(i, j) = vb(i, j)*fy(j)
+         end do
       end do
 
-      do j = js + 2, je - 2
+      do j = js + 4, je - 4
          courant(is + 1:ie - 1) = dtdx*ub(is + 1:ie - 1, j)
          call ppm_flux(fx(is + 1:ie - 1), ud(is + 1:ie - 1, j), &
                        courant(is + 1:ie - 1), is + 1, ie - 1, &
                        variant=PPM_CONSTRAINED)
 
-         kinetic_energy(is + 1:ie - 1, j) = &
-            .5*(ub(is + 1:ie - 1, j)*fx(is + 1:ie - 1) &
-                + vb(is + 1:ie - 1, j)*kinetic_energy(is + 1:ie - 1, j))
+         do i = is + 4, ie - 4
+            kinetic_energy(i, j) = .5*(kinetic_energy(i, j) + ub(i, j)*fx(i))
+         end do
       end do
 
-      do concurrent(i=is + 3:ie - 3, j=js + 3:je - 3)
+      do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
          vorticity(i, j) = config%coriolis &
                            - (ud(i, j + 1) - ud(i, j))/config%dy &
                            + (vd(i + 1, j) - vd(i, j))/config%dx
+      end do
 
+      do concurrent(i=is + 8:ie - 7, j=js + 8:je - 7)
          energy(i, j) = &
             kinetic_energy(i, j) + config%gravity*( &
             h(i, j) + h(i - 1, j) + h(i, j - 1) + h(i - 1, j - 1))/4.
@@ -353,26 +375,26 @@ contains
       ! Update the prognostic D grid u (`ud`)
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 2, je - 2
+      do j = js + 5, je - 5
          courant(is + 2:ie - 2) = dtdx*ua(is + 2:ie - 2, j)
          call ppm_flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
                        courant(is + 2:ie - 2), is + 2, ie - 2, &
                        variant=PPM_CONSTRAINED)
 
-         do i = is + 4, ie - 4
+         do i = is + 5, ie - 5
             tmp(i, j) = &
                .5*(vorticity(i, j) + &
                    denom_x(i, j)*(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
          end do
       end do
 
-      do i = is + 6, ie - 6
-         courant(js + 2:je - 2) = dtdy*vc(i, js + 2:je - 2)
-         call ppm_flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
-                       courant(js + 2:je - 2), is + 2, ie - 2, &
+      do i = is + 5, ie - 5
+         courant(js + 5:je - 5) = dtdy*vc(i, js + 5:je - 5)
+         call ppm_flux(fy(js + 5:je - 5), tmp(i, js + 5:je - 5), &
+                       courant(js + 5:je - 5), is + 5, ie - 5, &
                        variant=PPM_CONSTRAINED)
 
-         do j = js + 6, je - 6
+         do j = js + 8, je - 8
             ud(i, j) = ud(i, j) &
                        + dt*vc(i, j)*fy(j) &
                        - dtdx*(energy(i + 1, j) - energy(i, j))
@@ -383,26 +405,26 @@ contains
       ! Update the prognostic D grid v (`vd`)
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 2, ie - 2
+      do i = is + 5, ie - 5
          courant(js + 2:je - 2) = dtdy*va(i, js + 2:je - 2)
          call ppm_flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
                        courant(js + 2:je - 2), js + 2, je - 2, &
                        variant=PPM_CONSTRAINED)
 
-         do j = js + 4, je - 4
+         do j = js + 5, je - 5
             tmp(i, j) = &
                .5*(vorticity(i, j) + &
                    denom_y(i, j)*(vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
          end do
       end do
 
-      do j = js + 6, je - 6
-         courant(is + 2:ie - 2) = dtdx*uc(is + 2:ie - 2, j)
-         call ppm_flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
-                       courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 8, je - 8
+         courant(is + 5:ie - 5) = dtdx*uc(is + 5:ie - 5, j)
+         call ppm_flux(fx(is + 5:ie - 5), tmp(is + 5:ie - 5, j), &
+                       courant(is + 5:ie - 5), is + 5, ie - 5, &
                        variant=PPM_CONSTRAINED)
 
-         do i = is + 6, ie - 6
+         do i = is + 8, ie - 8
             vd(i, j) = vd(i, j) &
                        - dt*uc(i, j)*fx(i) &
                        - dtdy*(energy(i, j + 1) - energy(i, j))
@@ -410,6 +432,12 @@ contains
       end do
 
    end subroutine dgrid_dynamics_step
+
+   subroutine dgrid_halo_exchange()
+
+      call halo_exchange(h, ud, vd)
+
+   end subroutine dgrid_halo_exchange
 
    subroutine ppm_flux(f, q, c, isl, iel, variant)
       ! Calculate numerical fluxes of q given an array of Courant numbers c, assuming

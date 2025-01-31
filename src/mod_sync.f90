@@ -4,7 +4,6 @@ module mod_sync
    use mod_config, only: config => main_config
    use mod_tiles, only: neighbours, &
                         is, ie, js, je, isd, ied, jsd, jed, halo_width
-   use mod_fields, only: h, ud, vd
    use mod_util, only: set
 
    implicit none
@@ -32,19 +31,22 @@ module mod_sync
 
 contains
 
-   subroutine halo_exchange()
+   subroutine halo_exchange(h, u, v)
+      real(rk), intent(inout) :: h(is:ie, js:je)
+      real(rk), intent(inout) :: u(is:ie, js:je)
+      real(rk), intent(inout) :: v(is:ie, js:je)
 
       sync images(set(neighbours))
 
       call copy_to_buffer(h, 1)
-      call copy_to_buffer(ud, 2)
-      call copy_to_buffer(vd, 3)
+      call copy_to_buffer(u, 2)
+      call copy_to_buffer(v, 3)
 
       sync images(set(neighbours))
 
       call copy_from_buffer(h, 1)
-      call copy_from_buffer(ud, 2)
-      call copy_from_buffer(vd, 3)
+      call copy_from_buffer(u, 2)
+      call copy_from_buffer(v, 3)
 
    end subroutine halo_exchange
 

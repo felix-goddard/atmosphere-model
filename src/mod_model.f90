@@ -8,8 +8,9 @@ module mod_model
    use mod_input, only: read_initial_file
    use mod_tiles, only: init_tiles
    use mod_fields, only: init_prognostic_fields
-   use mod_sw_dyn, only: allocate_sw_dyn_arrays, cgrid_dynamics_step, &
-                         dgrid_dynamics_step, is_stable
+   use mod_sw_dyn, only: allocate_sw_dyn_arrays, is_stable, &
+                         cgrid_dynamics_step, cgrid_halo_exchange, &
+                         dgrid_dynamics_step, dgrid_halo_exchange
    use mod_sync, only: halo_exchange, allocate_sync_buffers
    use mod_output, only: accumulate_output, write_output, write_restart_file
 
@@ -49,7 +50,7 @@ contains
       call allocate_sync_buffers()
 
       call timing_on('HALO EXCHANGE')
-      call halo_exchange()
+      call dgrid_halo_exchange()
       call timing_off('HALO EXCHANGE')
 
       previous_write_time = config%t_initial
@@ -100,15 +101,19 @@ contains
          call cgrid_dynamics_step(dt/2.)
          call timing_off('CGRID DYNAMICS')
 
+         call timing_on('HALO EXCHANGE')
+         call cgrid_halo_exchange()
+         call timing_off('HALO EXCHANGE')
+
          call timing_on('DGRID DYNAMICS')
          call dgrid_dynamics_step(dt)
          call timing_off('DGRID DYNAMICS')
 
-         stable = is_stable()
-
          call timing_on('HALO EXCHANGE')
-         call halo_exchange()
+         call dgrid_halo_exchange()
          call timing_off('HALO EXCHANGE')
+
+         stable = is_stable()
 
          call co_reduce(stable, and_func)
          if (.not. stable) then
