@@ -392,7 +392,7 @@ contains
       do i = is + 5, ie - 5
          courant(js + 5:je - 5) = dtdy*vc(i, js + 5:je - 5)
          call flux(fy(js + 5:je - 5), tmp(i, js + 5:je - 5), &
-                   courant(js + 5:je - 5), is + 5, ie - 5, &
+                   courant(js + 5:je - 5), js + 5, je - 5, &
                    variant=PPM_CONSTRAINED)
 
          do j = js + 8, je - 8
