@@ -103,51 +103,51 @@ contains
       end do
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 4, ie - 4
+      do i = is + 2, ie - 2
          courant(js + 1:je - 1) = dtdy*vc(i, js + 1:je - 1)
          call flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
                    courant(js + 1:je - 1), js + 1, je - 1, &
                    variant=PIECEWISE_CONSTANT)
 
-         do j = js + 4, je - 4
+         do j = js + 2, je - 2
             tmp(i, j) = .5*(h(i, j) &
                             + denom_y(i, j)*(h(i, j) - rA*(fy(j + 1) - fy(j))))
          end do
       end do
 
       ! calculate the outer step in the x-direction
-      do j = js + 7, je - 7
-         courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
-         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
-                   courant(is + 4:ie - 4), is + 4, ie - 4, &
+      do j = js + 5, je - 5
+         courant(is + 2:ie - 2) = dtdx*uc(is + 2:ie - 2, j)
+         call flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
+                   courant(is + 2:ie - 2), is + 2, ie - 2, &
                    variant=PPM_UNCONSTRAINED)
 
-         do i = is + 7, ie - 7
+         do i = is + 5, ie - 5
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
          end do
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 4, je - 4
+      do j = js + 2, je - 2
          courant(is + 1:ie - 1) = dtdx*uc(is + 1:ie - 1, j)
          call flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
                    courant(is + 1:ie - 1), is + 1, ie - 1, &
                    variant=PIECEWISE_CONSTANT)
 
-         do i = is + 4, ie - 4
+         do i = is + 2, ie - 2
             tmp(i, j) = .5*(h(i, j) &
                             + denom_x(i, j)*(h(i, j) - rA*(fx(i + 1) - fx(i))))
          end do
       end do
 
       ! calculate the outer step in the y-direction
-      do i = is + 7, ie - 7
-         courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
-         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
-                   courant(js + 4:je - 4), js + 4, je - 4, &
+      do i = is + 5, ie - 5
+         courant(js + 2:je - 2) = dtdy*vc(i, js + 2:je - 2)
+         call flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
+                   courant(js + 2:je - 2), js + 2, je - 2, &
                    variant=PPM_UNCONSTRAINED)
 
-         do j = js + 7, je - 7
+         do j = js + 5, je - 5
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
          end do
       end do
@@ -155,26 +155,25 @@ contains
       ! ===========================================================================
       ! Energy and vorticity
 
-      do i = is + 4, ie - 4
-         courant(js + 5:je - 3) = dtdy*va(i, js + 5:je - 3)
-         call flux(fy(js + 5:je - 3), vc(i, js + 5:je - 3), &
-                   courant(js + 5:je - 3), js + 5, je - 3, &
+      do i = is + 5, ie - 5
+         courant(js + 2:je - 2) = dtdy*va(i, js + 2:je - 2)
+         call flux(fy(js + 2:je - 2), vc(i, js + 3:je - 1), &
+                   courant(js + 2:je - 2), js + 2, je - 2, &
                    variant=PPM_UNCONSTRAINED)
 
-         do j = js + 7, je - 7
-            kinetic_energy(i, j) = va(i, j)*fy(j + 1)
+         do j = js + 5, je - 5
+            kinetic_energy(i, j) = va(i, j)*fy(j)
          end do
       end do
 
-      do j = js + 4, je - 4
-         courant(is + 5:ie - 3) = dtdx*ua(is + 5:ie - 3, j)
-         call flux(fx(is + 5:ie - 3), uc(is + 5:ie - 3, j), &
-                   courant(is + 5:ie - 3), is + 5, ie - 3, &
+      do j = js + 5, je - 5
+         courant(is + 2:ie - 2) = dtdx*ua(is + 2:ie - 2, j)
+         call flux(fx(is + 2:ie - 2), uc(is + 3:ie - 1, j), &
+                   courant(is + 2:ie - 2), is + 2, ie - 2, &
                    variant=PPM_UNCONSTRAINED)
 
-         do i = is + 7, ie - 7
-            kinetic_energy(i, j) = &
-               .5*(kinetic_energy(i, j) + ua(i, j)*fx(i + 1))
+         do i = is + 5, ie - 5
+            kinetic_energy(i, j) = .5*(kinetic_energy(i, j) + ua(i, j)*fx(i))
          end do
       end do
 
@@ -184,36 +183,41 @@ contains
                            + (vc(i, j) - vc(i - 1, j))/config%dx
       end do
 
-      do concurrent(i=is + 7:ie - 7, j=js + 7:je - 7)
+      do concurrent(i=is + 5:ie - 5, j=js + 5:je - 5)
          energy(i, j) = kinetic_energy(i, j) + config%gravity*hc(i, j)
       end do
 
       ! ===========================================================================
       ! Calculate C grid u (`uc`)
 
+      do concurrent(i=is + 2:ie - 2, j=js + 2:je - 2)
+         denom_x(i, j) = 1./(1.-dtdx*(ud(i, j) - ud(i - 1, j)))
+         denom_y(i, j) = 1./(1.-dtdy*(vd(i, j) - vd(i, j - 1)))
+      end do
+
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 4, je - 4
-         courant(is + 1:ie - 1) = dtdx*ub(is + 1:ie - 1, j)
-         call flux(fx(is + 1:ie - 1), vorticity(is + 1:ie - 1, j), &
-                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+      do j = js + 3, je - 3
+         courant(is + 2:ie - 2) = dtdx*ud(is + 1:ie - 3, j)
+         call flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
+                   courant(is + 2:ie - 2), is + 2, ie - 2, &
                    variant=PIECEWISE_CONSTANT)
 
-         do i = is + 4, ie - 4
+         do i = is + 3, ie - 3
             tmp(i, j) = &
                .5*(vorticity(i, j) &
                    + denom_x(i, j)*(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
          end do
       end do
 
-      do i = is + 8, ie - 8
+      do i = is + 7, ie - 7
          courant(js + 4:je - 4) = dtdy*vd(i, js + 4:je - 4)
-         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+         call flux(fy(js + 4:je - 4), tmp(i, js + 5:je - 3), &
                    courant(js + 4:je - 4), js + 4, je - 4, &
                    variant=PPM_UNCONSTRAINED)
 
-         do j = js + 8, je - 8
+         do j = js + 7, je - 7
             uc(i, j) = uc(i, j) &
-                       + dt*vd(i, j)*fy(j + 1) &
+                       + dt*vd(i, j)*fy(j) &
                        - dtdx*(energy(i, j) - energy(i - 1, j))
          end do
       end do
@@ -222,28 +226,28 @@ contains
       ! Calculate C grid v (`vc`)
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 4, ie - 4
-         courant(js + 1:je - 1) = dtdy*vb(i, js + 1:je - 1)
-         call flux(fy(js + 1:je - 1), vorticity(i, js + 1:je - 1), &
-                   courant(js + 1:je - 1), js + 1, je - 1, &
+      do i = is + 3, ie - 3
+         courant(js + 2:je - 2) = dtdy*vd(i, js + 1:je - 3)
+         call flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
+                   courant(js + 2:je - 2), js + 2, je - 2, &
                    variant=PIECEWISE_CONSTANT)
 
-         do j = js + 4, je - 4
+         do j = js + 3, je - 3
             tmp(i, j) = &
                .5*(vorticity(i, j) + &
                    denom_y(i, j)*(vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
          end do
       end do
 
-      do j = js + 8, je - 8
+      do j = js + 7, je - 7
          courant(is + 4:ie - 4) = dtdx*ud(is + 4:ie - 4, j)
-         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+         call flux(fx(is + 4:ie - 4), tmp(is + 5:ie - 3, j), &
                    courant(is + 4:ie - 4), is + 4, ie - 4, &
                    variant=PPM_UNCONSTRAINED)
 
-         do i = is + 8, ie - 8
+         do i = is + 7, ie - 7
             vc(i, j) = vc(i, j) &
-                       - dt*ud(i, j)*fx(i + 1) &
+                       - dt*ud(i, j)*fx(i) &
                        - dtdy*(energy(i, j) - energy(i, j - 1))
          end do
       end do
@@ -265,17 +269,12 @@ contains
       dtdy = dt/config%dy
       rA = 1./(config%dx*config%dy)
 
-      ! Update the other winds based on the new C grid winds; since uc and vc
-      ! get updated on is/js+6 to ie/je-6 we can only calculate these on is+7 to ie-7
-      do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
-         ua(i, j) = .5*(uc(i, j) + uc(i + 1, j))
-         va(i, j) = .5*(vc(i, j) + vc(i, j + 1))
-
+      do concurrent(i=is + 1:ie, j=js + 1:je)
          ub(i, j) = .5*(uc(i, j) + uc(i, j - 1))
          vb(i, j) = .5*(vc(i, j) + vc(i - 1, j))
       end do
 
-      do concurrent(i=is + 2:ie - 2, j=js + 2:je - 2)
+      do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
          denom_x(i, j) = 1./(1.-dtdx*(uc(i + 1, j) - uc(i, j)))
          denom_y(i, j) = 1./(1.-dtdy*(vc(i, j + 1) - vc(i, j)))
       end do
@@ -284,56 +283,56 @@ contains
       ! Update the prognostic h field
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 4, ie - 4
-         courant(js + 1:je - 1) = dtdy*va(i, js + 1:je - 1)
-         call flux(fy(js + 1:je - 1), h(i, js + 1:je - 1), &
-                   courant(js + 1:je - 1), js + 1, je - 1, &
+      do i = is + 1, ie - 1
+         courant(js:je) = dtdy*vc(i, js:je)
+         call flux(fy(js:je), h(i, js:je), &
+                   courant(js:je), js, je, &
                    variant=PIECEWISE_CONSTANT)
 
-         do j = js + 4, je - 4
+         do j = js + 1, je - 1
             tmp(i, j) = .5*(h(i, j) + &
                             denom_y(i, j)*(h(i, j) - rA*(fy(j + 1) - fy(j))))
          end do
       end do
 
       ! calculate the outer step in the x-direction
-      do j = js + 7, je - 7
-         courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
-         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
-                   courant(is + 4:ie - 4), is + 4, ie - 4, &
+      do j = js + 4, je - 4
+         courant(is + 1:ie - 1) = dtdx*uc(is + 1:ie - 1, j)
+         call flux(fx(is + 1:ie - 1), tmp(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
                    variant=PPM_CONSTRAINED)
 
-         do i = is + 7, ie - 7
+         do i = is + 4, ie - 4
             hc(i, j) = h(i, j) - (fx(i + 1)*courant(i + 1) - fx(i)*courant(i))
          end do
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 4, je - 4
-         courant(is + 1:ie - 1) = dtdx*ua(is + 1:ie - 1, j)
-         call flux(fx(is + 1:ie - 1), h(is + 1:ie - 1, j), &
-                   courant(is + 1:ie - 1), is + 1, ie - 1, &
+      do j = js + 1, je - 1
+         courant(is:ie) = dtdx*uc(is:ie, j)
+         call flux(fx(is:ie), h(is:ie, j), &
+                   courant(is:ie), is, ie, &
                    variant=PIECEWISE_CONSTANT)
 
-         do i = is + 4, ie - 4
+         do i = is + 1, ie - 1
             tmp(i, j) = .5*(h(i, j) + &
                             denom_x(i, j)*(h(i, j) - rA*(fx(i + 1) - fx(i))))
          end do
       end do
 
       ! calculate the outer step in the y-direction
-      do i = is + 7, ie - 7
-         courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
-         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
-                   courant(js + 4:je - 4), js + 4, je - 4, &
+      do i = is + 4, ie - 4
+         courant(js + 1:je - 1) = dtdy*vc(i, js + 1:je - 1)
+         call flux(fy(js + 1:je - 1), tmp(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
                    variant=PPM_CONSTRAINED)
 
-         do j = js + 7, je - 7
+         do j = js + 4, je - 4
             hc(i, j) = hc(i, j) - (fy(j + 1)*courant(j + 1) - fy(j)*courant(j))
          end do
       end do
 
-      h(is + 7:ie - 7, js + 7:je - 7) = hc(is + 7:ie - 7, js + 7:je - 7)
+      h(is + 4:ie - 4, js + 4:je - 4) = hc(is + 4:ie - 4, js + 4:je - 4)
 
       ! ===========================================================================
       ! Energy and vorticity
@@ -366,7 +365,7 @@ contains
                            + (vd(i + 1, j) - vd(i, j))/config%dx
       end do
 
-      do concurrent(i=is + 8:ie - 7, j=js + 8:je - 7)
+      do concurrent(i=is + 5:ie - 4, j=js + 5:je - 4)
          energy(i, j) = &
             kinetic_energy(i, j) + config%gravity*( &
             h(i, j) + h(i - 1, j) + h(i, j - 1) + h(i - 1, j - 1))/4.
@@ -376,26 +375,26 @@ contains
       ! Update the prognostic D grid u (`ud`)
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
-      do j = js + 5, je - 5
-         courant(is + 2:ie - 2) = dtdx*ua(is + 2:ie - 2, j)
-         call flux(fx(is + 2:ie - 2), vorticity(is + 2:ie - 2, j), &
-                   courant(is + 2:ie - 2), is + 2, ie - 2, &
+      do j = js + 4, je - 4
+         courant(is + 1:ie - 1) = dtdx*uc(is + 1:ie - 1, j)
+         call flux(fx(is + 1:ie - 1), vorticity(is + 1:ie - 1, j), &
+                   courant(is + 1:ie - 1), is + 1, ie - 1, &
                    variant=PIECEWISE_CONSTANT)
 
-         do i = is + 5, ie - 5
+         do i = is + 4, ie - 4
             tmp(i, j) = &
                .5*(vorticity(i, j) + &
                    denom_x(i, j)*(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
          end do
       end do
 
-      do i = is + 5, ie - 5
-         courant(js + 5:je - 5) = dtdy*vc(i, js + 5:je - 5)
-         call flux(fy(js + 5:je - 5), tmp(i, js + 5:je - 5), &
-                   courant(js + 5:je - 5), js + 5, je - 5, &
+      do i = is + 7, ie - 7
+         courant(js + 4:je - 4) = dtdy*vc(i, js + 4:je - 4)
+         call flux(fy(js + 4:je - 4), tmp(i, js + 4:je - 4), &
+                   courant(js + 4:je - 4), js + 4, je - 4, &
                    variant=PPM_CONSTRAINED)
 
-         do j = js + 8, je - 8
+         do j = js + 7, je - 7
             ud(i, j) = ud(i, j) &
                        + dt*vc(i, j)*fy(j) &
                        - dtdx*(energy(i + 1, j) - energy(i, j))
@@ -406,26 +405,26 @@ contains
       ! Update the prognostic D grid v (`vd`)
 
       ! calculate the inner step (in the y-direction) for the outer x-direction step
-      do i = is + 5, ie - 5
-         courant(js + 2:je - 2) = dtdy*va(i, js + 2:je - 2)
-         call flux(fy(js + 2:je - 2), vorticity(i, js + 2:je - 2), &
-                   courant(js + 2:je - 2), js + 2, je - 2, &
+      do i = is + 4, ie - 4
+         courant(js + 1:je - 1) = dtdy*vc(i, js + 1:je - 1)
+         call flux(fy(js + 1:je - 1), vorticity(i, js + 1:je - 1), &
+                   courant(js + 1:je - 1), js + 1, je - 1, &
                    variant=PIECEWISE_CONSTANT)
 
-         do j = js + 5, je - 5
+         do j = js + 4, je - 4
             tmp(i, j) = &
                .5*(vorticity(i, j) + &
                    denom_y(i, j)*(vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
          end do
       end do
 
-      do j = js + 8, je - 8
-         courant(is + 5:ie - 5) = dtdx*uc(is + 5:ie - 5, j)
-         call flux(fx(is + 5:ie - 5), tmp(is + 5:ie - 5, j), &
-                   courant(is + 5:ie - 5), is + 5, ie - 5, &
+      do j = js + 7, je - 7
+         courant(is + 4:ie - 4) = dtdx*uc(is + 4:ie - 4, j)
+         call flux(fx(is + 4:ie - 4), tmp(is + 4:ie - 4, j), &
+                   courant(is + 4:ie - 4), is + 4, ie - 4, &
                    variant=PPM_CONSTRAINED)
 
-         do i = is + 8, ie - 8
+         do i = is + 7, ie - 7
             vd(i, j) = vd(i, j) &
                        - dt*uc(i, j)*fx(i) &
                        - dtdy*(energy(i, j + 1) - energy(i, j))

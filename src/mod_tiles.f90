@@ -9,7 +9,7 @@ module mod_tiles
    public :: init_tiles, neighbours, &
              is, ie, js, je, isd, ied, jsd, jed, halo_width
 
-   integer(ik), parameter :: halo_width = 9
+   integer(ik), parameter :: halo_width = 7
    integer(ik) :: is, ie, js, je ! data bounds (including halo)
    integer(ik) :: isd, ied, jsd, jed ! domain bounds (not including halo)
    integer(ik) :: neighbours(8)
