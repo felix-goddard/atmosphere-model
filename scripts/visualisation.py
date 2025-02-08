@@ -30,8 +30,8 @@ y_momentum = (data.h * data.v).sum(['x', 'y'])
 potential_energy = .5 * gravity * (data.h**2).sum(['x', 'y'])
 kinetic_energy = .5 * (data.h * (data.u**2 + data.v**2)).sum(['x', 'y'])
 total_energy = potential_energy + kinetic_energy
-absolute_vorticity = (
-    coriolis - data.u.differentiate('y') + data.v.differentiate('x')).sum(['x','y'])
+potential_vorticity = (
+    (coriolis - data.u.differentiate('y') + data.v.differentiate('x')) / data.h).sum(['x','y'])
 
 #=======================================================
 # Plotting setup -- axes, normalisation, colorbars, etc.
@@ -119,7 +119,7 @@ timeseries = [
     # (1, None, potential_energy/total_energy[0], dict(c='b', ls='-')),
     # (1, None, kinetic_energy/total_energy[0], dict(c='r', ls='-')),
     (1, 'Fractional energy anomaly', total_energy/total_energy[0] - 1, dict(c='k', ls='-', lw=2)),
-    (0, 'Fractional absolute vorticity anomaly', absolute_vorticity/absolute_vorticity[0] - 1, dict(c='k', ls='-')),
+    (0, 'Fractional potential vorticity anomaly', potential_vorticity/potential_vorticity[0] - 1, dict(c='k', ls='-')),
 ]
 
 timeseries_lines = []
