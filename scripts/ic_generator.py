@@ -25,6 +25,7 @@ face_ys = mass_ys - dy/2
 # Initialise data arrays
 
 h = np.zeros((ny,nx))
+pt = np.zeros((ny,nx))
 u = np.zeros((ny,nx))
 v = np.zeros((ny,nx))
 
@@ -63,6 +64,7 @@ v[:,:] *= -f*r/2 + np.sqrt((f*r/2)**2 + (g * 2*height*decay * r**2 * np.exp(-dec
 xr.Dataset(
     data_vars=dict(
         h=(['yc', 'xc', 't'], h[..., np.newaxis]),
+        pt=(['yc', 'xc', 't'], pt[..., np.newaxis]),
         u=(['yc', 'xf', 't'], u[..., np.newaxis]),
         v=(['yf', 'xc', 't'], v[..., np.newaxis]),
     ),

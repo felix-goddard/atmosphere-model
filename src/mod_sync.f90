@@ -11,7 +11,7 @@ module mod_sync
    private
    public :: halo_exchange, allocate_sync_buffers
 
-   integer, parameter :: n_prognostics = 3
+   integer, parameter :: n_prognostics = 4
    real(rk), allocatable :: edge_buffer(:, :, :, :) [:]
    real(rk), allocatable :: corner_buffer(:, :, :, :) [:]
 
@@ -31,22 +31,25 @@ module mod_sync
 
 contains
 
-   subroutine halo_exchange(h, u, v)
+   subroutine halo_exchange(h, pt, u, v)
       real(rk), intent(inout) :: h(is:ie, js:je)
+      real(rk), intent(inout) :: pt(is:ie, js:je)
       real(rk), intent(inout) :: u(is:ie, js:je)
       real(rk), intent(inout) :: v(is:ie, js:je)
 
       sync images(set(neighbours))
 
       call copy_to_buffer(h, 1)
-      call copy_to_buffer(u, 2)
-      call copy_to_buffer(v, 3)
+      call copy_to_buffer(pt, 2)
+      call copy_to_buffer(u, 3)
+      call copy_to_buffer(v, 4)
 
       sync images(set(neighbours))
 
       call copy_from_buffer(h, 1)
-      call copy_from_buffer(u, 2)
-      call copy_from_buffer(v, 3)
+      call copy_from_buffer(pt, 2)
+      call copy_from_buffer(u, 3)
+      call copy_from_buffer(v, 4)
 
    end subroutine halo_exchange
 

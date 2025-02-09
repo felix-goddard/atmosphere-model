@@ -5,7 +5,7 @@ module mod_sw_dyn
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_fields, only: h, ud, vd
+   use mod_fields, only: h, pt, ud, vd, heat_source
    use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
@@ -17,6 +17,7 @@ module mod_sw_dyn
              dgrid_dynamics_step, dgrid_halo_exchange
 
    real(rk), allocatable :: hc(:, :) ! height for the C grid half-step
+   real(rk), allocatable :: ptc(:, :) ! potential temperature for the C grid half-step
 
    real(rk), allocatable :: vorticity(:, :)
    real(rk), allocatable :: kinetic_energy(:, :)
@@ -53,6 +54,7 @@ module mod_sw_dyn
    real(rk), allocatable :: tmp(:, :)
 
    real(rk), allocatable :: fx(:), fy(:), cx(:, :), cy(:, :)
+   real(rk), allocatable :: hfx(:, :), hfy(:, :) ! height fluxes
    real(rk), allocatable :: denom_x(:, :), denom_y(:, :)
    real(rk), allocatable :: edge_L(:), edge_R(:) ! values calculated by the PPM
 
@@ -67,6 +69,7 @@ contains
       logical :: is_stable
 
       is_stable = (all(ieee_is_finite(h(isd:ied, jsd:jed))) &
+                   .and. all(ieee_is_finite(pt(isd:ied, jsd:jed))) &
                    .and. all(ieee_is_finite(ud(isd:ied, jsd:jed))) &
                    .and. all(ieee_is_finite(vd(isd:ied, jsd:jed))))
 
@@ -125,8 +128,10 @@ contains
                    variant=PPM_UNCONSTRAINED)
 
          do i = is + 5, ie - 5
+            hfx(i, j) = fx(i)*cx(i, j)
             hc(i, j) = h(i, j) - (fx(i + 1)*cx(i + 1, j) - fx(i)*cx(i, j))
          end do
+         hfx(ie - 4, j) = fx(ie - 4)*cx(ie - 4, j)
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
@@ -148,7 +153,61 @@ contains
                    variant=PPM_UNCONSTRAINED)
 
          do j = js + 5, je - 5
+            hfy(i, j) = fy(j)*cy(i, j)
             hc(i, j) = hc(i, j) - (fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
+         end do
+         hfy(je - 4, j) = fy(je - 4)*cy(i, je - 4)
+      end do
+
+      ! ===========================================================================
+      ! Calculate potential temperature update from the C grid winds (`ptc`)
+
+      ! calculate the inner step (in the y-direction) for the outer x-direction step
+      do i = is + 2, ie - 2
+         call flux(fy(js + 1:je - 1), pt(i, js + 1:je - 1), &
+                   cy(i, js + 1:je - 1), js + 1, je - 1, &
+                   variant=PIECEWISE_CONSTANT)
+
+         do j = js + 2, je - 2
+            tmp(i, j) = .5*(pt(i, j) &
+                            + denom_y(i, j)*(pt(i, j) - rA*(fy(j + 1) - fy(j))))
+         end do
+      end do
+
+      ! calculate the outer step in the x-direction
+      do j = js + 5, je - 5
+         call flux(fx(is + 2:ie - 2), tmp(is + 2:ie - 2, j), &
+                   cx(is + 2:ie - 2, j), is + 2, ie - 2, &
+                   variant=PPM_UNCONSTRAINED)
+
+         do i = is + 5, ie - 5
+            ptc(i, j) = h(i, j)*pt(i, j) &
+                        - (fx(i + 1)*hfx(i + 1, j) - fx(i)*hfx(i, j))
+         end do
+      end do
+
+      ! calculate the inner step (in the x-direction) for the outer y-direction step
+      do j = js + 2, je - 2
+         call flux(fx(is + 1:ie - 1), pt(is + 1:ie - 1, j), &
+                   cx(is + 1:ie - 1, j), is + 1, ie - 1, &
+                   variant=PIECEWISE_CONSTANT)
+
+         do i = is + 2, ie - 2
+            tmp(i, j) = .5*(pt(i, j) &
+                            + denom_x(i, j)*(pt(i, j) - rA*(fx(i + 1) - fx(i))))
+         end do
+      end do
+
+      ! calculate the outer step in the y-direction
+      do i = is + 5, ie - 5
+         call flux(fy(js + 2:je - 2), tmp(i, js + 2:je - 2), &
+                   cy(i, js + 2:je - 2), js + 2, je - 2, &
+                   variant=PPM_UNCONSTRAINED)
+
+         do j = js + 5, je - 5
+            ptc(i, j) = (ptc(i, j) &
+                         - (fy(j + 1)*hfy(i, j + 1) - fy(j)*hfy(i, j)) &
+                         + dt*h(i, j)*heat_source(i, j))/hc(i, j)
          end do
       end do
 
@@ -253,7 +312,7 @@ contains
 
    subroutine cgrid_halo_exchange()
 
-      call halo_exchange(hc, uc, vc)
+      call halo_exchange(hc, ptc, uc, vc)
 
    end subroutine cgrid_halo_exchange
 
@@ -301,8 +360,10 @@ contains
                    variant=PPM_NONNEGATIVE)
 
          do i = is + 4, ie - 4
+            hfx(i, j) = fx(i)*cx(i, j)
             hc(i, j) = h(i, j) - (fx(i + 1)*cx(i + 1, j) - fx(i)*cx(i, j))
          end do
+         hfx(ie - 3, j) = fx(ie - 3)*cx(ie - 3, j)
       end do
 
       ! calculate the inner step (in the x-direction) for the outer y-direction step
@@ -324,11 +385,66 @@ contains
                    variant=PPM_NONNEGATIVE)
 
          do j = js + 4, je - 4
+            hfy(i, j) = fy(j)*cy(i, j)
             hc(i, j) = hc(i, j) - (fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
+         end do
+         hfy(i, je - 3) = fy(je - 3)*cy(i, je - 3)
+      end do
+
+      ! ===========================================================================
+      ! Update the prognostic potential temperature field
+
+      ! calculate the inner step (in the y-direction) for the outer x-direction step
+      do i = is + 1, ie - 1
+         call flux(fy(js:je), pt(i, js:je), &
+                   cy(i, js:je), js, je, &
+                   variant=PIECEWISE_CONSTANT)
+
+         do j = js + 1, je - 1
+            tmp(i, j) = .5*(pt(i, j) + &
+                            denom_y(i, j)*(pt(i, j) - rA*(fy(j + 1) - fy(j))))
+         end do
+      end do
+
+      ! calculate the outer step in the x-direction
+      do j = js + 4, je - 4
+         call flux(fx(is + 1:ie - 1), tmp(is + 1:ie - 1, j), &
+                   cx(is + 1:ie - 1, j), is + 1, ie - 1, &
+                   variant=PPM_NONNEGATIVE)
+
+         do i = is + 4, ie - 4
+            ptc(i, j) = h(i, j)*pt(i, j) &
+                        - (fx(i + 1)*hfx(i + 1, j) - fx(i)*hfx(i, j))
+         end do
+      end do
+
+      ! calculate the inner step (in the x-direction) for the outer y-direction step
+      do j = js + 1, je - 1
+         call flux(fx(is:ie), pt(is:ie, j), &
+                   cx(is:ie, j), is, ie, &
+                   variant=PIECEWISE_CONSTANT)
+
+         do i = is + 1, ie - 1
+            tmp(i, j) = .5*(pt(i, j) + &
+                            denom_x(i, j)*(pt(i, j) - rA*(fx(i + 1) - fx(i))))
+         end do
+      end do
+
+      ! calculate the outer step in the y-direction
+      do i = is + 4, ie - 4
+         call flux(fy(js + 1:je - 1), tmp(i, js + 1:je - 1), &
+                   cy(i, js + 1:je - 1), js + 1, je - 1, &
+                   variant=PPM_NONNEGATIVE)
+
+         do j = js + 4, je - 4
+            ptc(i, j) = (ptc(i, j) &
+                         - (fy(j + 1)*hfy(i, j + 1) - fy(j)*hfy(i, j)) &
+                         + dt*h(i, j)*heat_source(i, j))/hc(i, j)
          end do
       end do
 
       h(is + 4:ie - 4, js + 4:je - 4) = hc(is + 4:ie - 4, js + 4:je - 4)
+      pt(is + 4:ie - 4, js + 4:je - 4) = ptc(is + 4:ie - 4, js + 4:je - 4)
 
       ! ===========================================================================
       ! Energy and vorticity
@@ -425,7 +541,7 @@ contains
 
    subroutine dgrid_halo_exchange()
 
-      call halo_exchange(h, ud, vd)
+      call halo_exchange(h, pt, ud, vd)
 
    end subroutine dgrid_halo_exchange
 
@@ -584,6 +700,7 @@ contains
       if (.not. allocated(vc)) allocate (vc(is:ie, js:je))
 
       if (.not. allocated(hc)) allocate (hc(is:ie, js:je))
+      if (.not. allocated(ptc)) allocate (ptc(is:ie, js:je))
 
       if (.not. allocated(tmp)) allocate (tmp(is:ie, js:je))
 
@@ -591,6 +708,8 @@ contains
       if (.not. allocated(fy)) allocate (fy(min(is, js):max(ie, je)))
       if (.not. allocated(cx)) allocate (cx(is:ie, js:je))
       if (.not. allocated(cy)) allocate (cy(is:ie, js:je))
+      if (.not. allocated(hfx)) allocate (hfx(is:ie, js:je))
+      if (.not. allocated(hfy)) allocate (hfy(is:ie, js:je))
       if (.not. allocated(denom_x)) allocate (denom_x(is:ie, js:je))
       if (.not. allocated(denom_y)) allocate (denom_y(is:ie, js:je))
 

@@ -4,7 +4,7 @@ module mod_output
    use mod_config, only: config => main_config
    use mod_netcdf, only: netcdf_file, create_netcdf
    use mod_tiles, only: isd, ied, jsd, jed
-   use mod_fields, only: h, ud, vd
+   use mod_fields, only: h, pt, ud, vd
 
    implicit none
 
@@ -14,7 +14,7 @@ module mod_output
 
    type(netcdf_file) :: output_nc
 
-   integer(ik), parameter :: n_output_fields = 3 ! number of outputs
+   integer(ik), parameter :: n_output_fields = 4 ! number of outputs
 
    real(rk), allocatable :: output_field(:, :, :)
    real(rk), allocatable :: compensation(:, :, :)
@@ -25,8 +25,9 @@ module mod_output
    ! these indices into `output_field` determine which variable we are
    ! accumulating or outputting; make sure these are unique
    integer(ik), parameter :: H_IDX = 1
-   integer(ik), parameter :: U_IDX = 2
-   integer(ik), parameter :: V_IDX = 3
+   integer(ik), parameter :: PT_IDX = 2
+   integer(ik), parameter :: U_IDX = 3
+   integer(ik), parameter :: V_IDX = 4
 
 contains
 
@@ -64,6 +65,7 @@ contains
             'y', [(-.5*config%Ly + (i + .5)*config%dy, i=0, config%ny - 1)])
 
          call output_nc%create_variable('h', ['t', 'x', 'y'])
+         call output_nc%create_variable('pt', ['t', 'x', 'y'])
          call output_nc%create_variable('u', ['t', 'x', 'y'])
          call output_nc%create_variable('v', ['t', 'x', 'y'])
 
@@ -85,6 +87,9 @@ contains
          do j = jsd, jed
             ! height
             call compensated_sum(dt*h(i, j), i, j, H_IDX)
+
+            ! potential temperature
+            call compensated_sum(dt*pt(i, j), i, j, PT_IDX)
 
             ! u wind
             call compensated_sum(dt*.5*(ud(i, j) + ud(i, j + 1)), i, j, U_IDX)
@@ -119,6 +124,9 @@ contains
 
       ! Output height field
       call write (output_nc, output_field(:, :, H_IDX), 'h')
+
+      ! Output potential temperature field
+      call write (output_nc, output_field(:, :, PT_IDX), 'pt')
 
       ! Output u wind
       call write (output_nc, output_field(:, :, U_IDX), 'u')
@@ -160,10 +168,12 @@ contains
          'yf', [(-.5*config%Ly + i*config%dy, i=0, config%ny - 1)])
 
       call restart_nc%create_variable('h', ['xc', 'yc'])
+      call restart_nc%create_variable('pt', ['xc', 'yc'])
       call restart_nc%create_variable('u', ['xc', 'yf'])
       call restart_nc%create_variable('v', ['xf', 'yc'])
 
       call write (restart_nc, h(isd:ied, jsd:jed), 'h')
+      call write (restart_nc, pt(isd:ied, jsd:jed), 'pt')
       call write (restart_nc, ud(isd:ied, jsd:jed), 'u')
       call write (restart_nc, vd(isd:ied, jsd:jed), 'v')
 
