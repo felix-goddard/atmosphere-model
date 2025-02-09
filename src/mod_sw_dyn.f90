@@ -59,6 +59,7 @@ module mod_sw_dyn
    integer(ik), parameter :: PIECEWISE_CONSTANT = 0
    integer(ik), parameter :: PPM_UNCONSTRAINED = 1
    integer(ik), parameter :: PPM_CONSTRAINED = 2
+   integer(ik), parameter :: PPM_NONNEGATIVE = 3
 
 contains
 
@@ -297,7 +298,7 @@ contains
       do j = js + 4, je - 4
          call flux(fx(is + 1:ie - 1), tmp(is + 1:ie - 1, j), &
                    cx(is + 1:ie - 1, j), is + 1, ie - 1, &
-                   variant=PPM_CONSTRAINED)
+                   variant=PPM_NONNEGATIVE)
 
          do i = is + 4, ie - 4
             hc(i, j) = h(i, j) - (fx(i + 1)*cx(i + 1, j) - fx(i)*cx(i, j))
@@ -320,7 +321,7 @@ contains
       do i = is + 4, ie - 4
          call flux(fy(js + 1:je - 1), tmp(i, js + 1:je - 1), &
                    cy(i, js + 1:je - 1), js + 1, je - 1, &
-                   variant=PPM_CONSTRAINED)
+                   variant=PPM_NONNEGATIVE)
 
          do j = js + 4, je - 4
             hc(i, j) = hc(i, j) - (fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
@@ -441,7 +442,10 @@ contains
       integer(ik) :: i
       real(rk) :: s, k1, k2
 
-      if (variant == PPM_UNCONSTRAINED .or. variant == PPM_CONSTRAINED) then
+      if (variant == PPM_UNCONSTRAINED &
+          .or. variant == PPM_CONSTRAINED &
+          .or. variant == PPM_NONNEGATIVE) then
+
          call ppm(q, isl, iel, variant)
 
          ! ppm defines the edges values over isl+2:iel-2 so we can calculate
@@ -451,10 +455,27 @@ contains
             k1 = (1.-2.*s)*(1.-s)
             k2 = s*(s - 1.)
 
-            if (c(i) > 0.) then
-               f(i) = q(i - 1) + k1*edge_R(i - 1) + k2*edge_L(i - 1)
+            ! apply monotonicity constraint: if
+            !   3 | left + right | > | left - right |
+            ! holds for both cells on this interface, we fall back to a
+            ! linear upwind scheme; otherwise we calculate the upwind PPM
+            if (variant == PPM_CONSTRAINED &
+                .and. (3.*abs(edge_L(i) + edge_R(i)) &
+                       > abs(edge_L(i) - edge_R(i))) &
+                .and. (3.*abs(edge_L(i - 1) + edge_R(i - 1)) &
+                       > abs(edge_L(i - 1) - edge_R(i - 1)))) then
+
+               if (c(i) > 0.) then
+                  f(i) = q(i - 1)
+               else
+                  f(i) = q(i)
+               end if
             else
-               f(i) = q(i) + k1*edge_L(i) + k2*edge_R(i)
+               if (c(i) > 0.) then
+                  f(i) = q(i - 1) + k1*edge_R(i - 1) + k2*edge_L(i - 1)
+               else
+                  f(i) = q(i) + k1*edge_L(i) + k2*edge_R(i)
+               end if
             end if
          end do
 
@@ -491,9 +512,11 @@ contains
       real(rk) :: dqi_min, dqi_max
       real(rk) :: dqi(isl + 1:iel - 1)
       real(rk) :: dqi_mono(isl + 1:iel - 1)
-      integer(ik) :: i
+      integer(ik) :: i, a, b
 
-      if (variant == PPM_UNCONSTRAINED .or. variant == PPM_CONSTRAINED) then
+      if (variant == PPM_UNCONSTRAINED &
+          .or. variant == PPM_CONSTRAINED &
+          .or. variant == PPM_NONNEGATIVE) then
 
          do i = isl + 1, iel - 1
             dqi(i) = (q(i + 1) - q(i - 1))/4.
@@ -506,12 +529,35 @@ contains
             edge_L(i) = (q(i - 1) - q(i))/2.+(dqi_mono(i - 1) - dqi_mono(i))/3.
             edge_R(i) = (q(i + 1) - q(i))/2.+(dqi_mono(i) - dqi_mono(i + 1))/3.
 
-            if (variant == PPM_CONSTRAINED) then
+            if (variant == PPM_CONSTRAINED &
+                .or. variant == PPM_NONNEGATIVE) then
+
                edge_L(i) = -sign( &
                            min(2.*abs(dqi(i)), abs(edge_L(i))), dqi(i))
 
                edge_R(i) = +sign( &
                            min(2.*abs(dqi(i)), abs(edge_R(i))), dqi(i))
+
+               if (variant == PPM_NONNEGATIVE) then
+                  ! filter negative edge values
+                  edge_L(i) = max(edge_L(i), -q(i))
+                  edge_R(i) = max(edge_R(i), -q(i))
+
+                  ! filter negative minima
+                  a = edge_R(i) - edge_L(i)
+                  b = -3.*(edge_R(i) + edge_L(i))
+                  if ((abs(a) < -b) &
+                      .and. (q(i) + a**2/(4*b) + b/12. < 0.)) then
+                     if (edge_L(i)*edge_R(i) > 0.) then
+                        edge_L(i) = 0.
+                        edge_R(i) = 0.
+                     else if (edge_L(i) > edge_R(i)) then
+                        edge_L(i) = 2.*abs(edge_R(i))
+                     else
+                        edge_R(i) = 2.*abs(edge_L(i))
+                     end if
+                  end if
+               end if
             end if
          end do
 
