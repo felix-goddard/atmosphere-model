@@ -8,8 +8,8 @@ module mod_netcdf
       nf90_open, nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable, &
       nf90_create, nf90_inq_dimid, nf90_def_dim, nf90_inq_varid, nf90_def_var, &
       nf90_put_var, nf90_get_var, nf90_enddef, nf90_redef, nf90_close, &
-      nf90_float, nf90_nowrite, nf90_clobber, nf90_strerror, nf90_noerr, &
-      nf90_unlimited
+      nf90_float, nf90_int, nf90_nowrite, nf90_clobber, nf90_strerror, &
+      nf90_noerr, nf90_unlimited
 
    implicit none
 
@@ -37,9 +37,14 @@ module mod_netcdf
    contains
       procedure :: close => close_netcdf
       procedure :: create_time_axis, advance_time
-      procedure :: create_axis, get_axis_index, read_axis
+      generic :: create_axis => create_real_axis, create_integer_axis
+      procedure, private :: create_real_axis, create_integer_axis
+      procedure :: get_axis_index, read_axis
       procedure :: create_variable, get_variable_index
-      procedure :: write_variable, read_variable
+      generic :: write_variable => write_2d_variable, write_3d_variable
+      procedure, private :: write_2d_variable, write_3d_variable
+      generic :: read_variable => read_2d_variable, read_3d_variable
+      procedure, private :: read_2d_variable, read_3d_variable
    end type
 
 contains
@@ -209,7 +214,7 @@ contains
 
    end subroutine advance_time
 
-   subroutine create_axis(self, name, points)
+   subroutine create_real_axis(self, name, points)
       class(netcdf_file), intent(inout) :: self
       character(len=*), intent(in) :: name
       real(rk), intent(in) :: points(:)
@@ -218,35 +223,74 @@ contains
       type(netcdf_axis) :: axis
 
       status = nf90_redef(self%ncid)
-      call handle_netcdf_error(status, 'create_axis')
+      call handle_netcdf_error(status, 'create_real_axis')
 
       do i = 1, size(self%axes)
          if (trim(self%axes(i)%name) == trim(name)) then
             write (log_str, '(a)') &
                'Axis by name `'//trim(name)//'` already exists.'
-            call logger%fatal('create_axis', log_str)
+            call logger%fatal('create_real_axis', log_str)
             call abort_now()
          end if
       end do
 
       status = nf90_def_dim(self%ncid, trim(name), size(points), dimid)
-      call handle_netcdf_error(status, 'create_axis')
+      call handle_netcdf_error(status, 'create_real_axis')
 
       status = nf90_def_var(self%ncid, trim(name), nf90_float, dimid, varid)
-      call handle_netcdf_error(status, 'create_axis')
+      call handle_netcdf_error(status, 'create_real_axis')
 
       axis = netcdf_axis(name, size(points), dimid, varid)
 
       status = nf90_enddef(self%ncid)
-      call handle_netcdf_error(status, 'create_axis')
+      call handle_netcdf_error(status, 'create_real_axis')
 
       status = nf90_put_var(self%ncid, varid, points)
-      call handle_netcdf_error(status, 'create_axis')
+      call handle_netcdf_error(status, 'create_real_axis')
 
       axes = [self%axes, axis]
       self%axes = axes
 
-   end subroutine create_axis
+   end subroutine create_real_axis
+
+   subroutine create_integer_axis(self, name, points)
+      class(netcdf_file), intent(inout) :: self
+      character(len=*), intent(in) :: name
+      integer(ik), intent(in) :: points(:)
+      integer(ik) :: status, dimid, varid, i
+      type(netcdf_axis), allocatable :: axes(:)
+      type(netcdf_axis) :: axis
+
+      status = nf90_redef(self%ncid)
+      call handle_netcdf_error(status, 'create_integer_axis')
+
+      do i = 1, size(self%axes)
+         if (trim(self%axes(i)%name) == trim(name)) then
+            write (log_str, '(a)') &
+               'Axis by name `'//trim(name)//'` already exists.'
+            call logger%fatal('create_integer_axis', log_str)
+            call abort_now()
+         end if
+      end do
+
+      status = nf90_def_dim(self%ncid, trim(name), size(points), dimid)
+      call handle_netcdf_error(status, 'create_integer_axis')
+
+      status = nf90_def_var(self%ncid, trim(name), nf90_int, dimid, varid)
+      call handle_netcdf_error(status, 'create_integer_axis')
+
+      axis = netcdf_axis(name, size(points), dimid, varid)
+
+      status = nf90_enddef(self%ncid)
+      call handle_netcdf_error(status, 'create_integer_axis')
+
+      status = nf90_put_var(self%ncid, varid, points)
+      call handle_netcdf_error(status, 'create_integer_axis')
+
+      axes = [self%axes, axis]
+      self%axes = axes
+
+   end subroutine create_integer_axis
 
    function get_axis_index(self, name) result(idx)
       class(netcdf_file), intent(in) :: self
@@ -363,7 +407,7 @@ contains
 
    end function get_variable_index
 
-   subroutine write_variable(self, name, data)
+   subroutine write_2d_variable(self, name, data)
       class(netcdf_file), intent(inout) :: self
       character(len=*), intent(in) :: name
       real(rk), intent(in) :: data(:, :)
@@ -374,7 +418,7 @@ contains
 
       if (idx == -1) then
          write (log_str, '(a)') 'Unknown variable `'//trim(name)//'`.'
-         call logger%fatal('write_variable', log_str)
+         call logger%fatal('write_2d_variable', log_str)
          call abort_now()
       end if
 
@@ -392,11 +436,44 @@ contains
                   count=[size(data, 1), size(data, 2)])
       end if
 
-      call handle_netcdf_error(status, 'write_variable')
+      call handle_netcdf_error(status, 'write_2d_variable')
 
-   end subroutine write_variable
+   end subroutine write_2d_variable
 
-   subroutine read_variable(self, name, data)
+   subroutine write_3d_variable(self, name, data)
+      class(netcdf_file), intent(inout) :: self
+      character(len=*), intent(in) :: name
+      real(rk), intent(in) :: data(:, :, :)
+      type(netcdf_var) :: var
+      integer(ik) :: status, idx
+
+      idx = self%get_variable_index(name)
+
+      if (idx == -1) then
+         write (log_str, '(a)') 'Unknown variable `'//trim(name)//'`.'
+         call logger%fatal('write_3d_variable', log_str)
+         call abort_now()
+      end if
+
+      var = self%vars(idx)
+
+      if (any(var%dims == self%t_axis%name)) then
+         status = nf90_put_var( &
+                  self%ncid, var%varid, data, &
+                  start=[1, 1, 1, self%t_axis%size], &
+                  count=[size(data, 1), size(data, 2), size(data, 3), 1])
+      else
+         status = nf90_put_var( &
+                  self%ncid, var%varid, data, &
+                  start=[1, 1, 1], &
+                  count=[size(data, 1), size(data, 2), size(data, 3)])
+      end if
+
+      call handle_netcdf_error(status, 'write_3d_variable')
+
+   end subroutine write_3d_variable
+
+   subroutine read_2d_variable(self, name, data)
       class(netcdf_file), intent(in) :: self
       character(len=*), intent(in) :: name
       real(rk), intent(inout) :: data(:, :)
@@ -407,7 +484,7 @@ contains
 
       if (idx == -1) then
          write (log_str, '(a)') 'Unknown variable `'//trim(name)//'`.'
-         call logger%fatal('read_variable', log_str)
+         call logger%fatal('read_2d_variable', log_str)
          call abort_now()
       end if
 
@@ -438,9 +515,57 @@ contains
                self%ncid, self%vars(idx)%varid, data, &
                start=start, count=count, map=dim_map)
 
-      call handle_netcdf_error(status, 'read_variable')
+      call handle_netcdf_error(status, 'read_2d_variable')
 
-   end subroutine read_variable
+   end subroutine read_2d_variable
+
+   subroutine read_3d_variable(self, name, data)
+      class(netcdf_file), intent(in) :: self
+      character(len=*), intent(in) :: name
+      real(rk), intent(inout) :: data(:, :, :)
+      integer(ik), allocatable :: start(:), count(:), dim_map(:)
+      integer(ik) :: status, idx, i, j
+
+      idx = self%get_variable_index(name)
+
+      if (idx == -1) then
+         write (log_str, '(a)') 'Unknown variable `'//trim(name)//'`.'
+         call logger%fatal('read_3d_variable', log_str)
+         call abort_now()
+      end if
+
+      allocate (start(1:size(self%vars(idx)%dims)))
+      allocate (count(1:size(self%vars(idx)%dims)))
+      allocate (dim_map(1:size(self%vars(idx)%dims)))
+
+      do i = 1, size(self%vars(idx)%dims)
+         if (self%vars(idx)%dims(i) == self%t_axis%name) then
+            start(i) = self%t_axis%size
+            count(i) = 1
+            dim_map(i) = 0
+         else
+            start(i) = 1
+
+            j = self%get_axis_index(self%vars(idx)%dims(i))
+            count(i) = self%axes(j)%size
+
+            if (any(self%vars(idx)%dims(i) == ['x ', 'xc', 'xf'])) then
+               dim_map(i) = 1
+            else if (any(self%vars(idx)%dims(i) == ['y ', 'yc', 'yf'])) then
+               dim_map(i) = config%nx
+            else if (self%vars(idx)%dims(i) == 'lev') then
+               dim_map(i) = config%nx*config%ny
+            end if
+         end if
+      end do
+
+      status = nf90_get_var( &
+               self%ncid, self%vars(idx)%varid, data, &
+               start=start, count=count, map=dim_map)
+
+      call handle_netcdf_error(status, 'read_3d_variable')
+
+   end subroutine read_3d_variable
 
    subroutine handle_netcdf_error(errcode, source)
       integer(ik), intent(in) :: errcode

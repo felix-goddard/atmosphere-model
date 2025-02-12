@@ -4,7 +4,7 @@ module mod_output
    use mod_config, only: config => main_config
    use mod_netcdf, only: netcdf_file, create_netcdf
    use mod_tiles, only: isd, ied, jsd, jed
-   use mod_fields, only: h, pt, ud, vd
+   use mod_fields, only: dp, pt, ud, vd, gz
 
    implicit none
 
@@ -16,15 +16,15 @@ module mod_output
 
    integer(ik), parameter :: n_output_fields = 4 ! number of outputs
 
-   real(rk), allocatable :: output_field(:, :, :)
-   real(rk), allocatable :: compensation(:, :, :)
+   real(rk), allocatable :: output_field(:, :, :, :)
+   real(rk), allocatable :: compensation(:, :, :, :)
    real(rk)              :: accumulation_time
-   real(rk), allocatable :: gather_coarray(:, :) [:]
-   real(rk), allocatable :: gather(:, :)
+   real(rk), allocatable :: gather_coarray(:, :, :) [:]
+   real(rk), allocatable :: gather(:, :, :)
 
    ! these indices into `output_field` determine which variable we are
    ! accumulating or outputting; make sure these are unique
-   integer(ik), parameter :: H_IDX = 1
+   integer(ik), parameter :: DP_IDX = 1
    integer(ik), parameter :: PT_IDX = 2
    integer(ik), parameter :: U_IDX = 3
    integer(ik), parameter :: V_IDX = 4
@@ -37,20 +37,22 @@ contains
       ! Allocate output arrays
 
       if (.not. allocated(output_field)) &
-         allocate (output_field(isd:ied, jsd:jed, n_output_fields))
+         allocate (output_field(isd:ied, jsd:jed, config%nlev, n_output_fields))
 
       if (.not. allocated(compensation)) &
-         allocate (compensation(isd:ied, jsd:jed, n_output_fields))
+         allocate (compensation(isd:ied, jsd:jed, config%nlev, n_output_fields))
 
+      output_field(:, :, :, :) = 0.
+      compensation(:, :, :, :) = 0.
       accumulation_time = 0.
 
       if (.not. allocated(gather_coarray)) &
-         allocate (gather_coarray(1:config%nx, 1:config%ny) [*])
+         allocate (gather_coarray(config%nx, config%ny, config%nlev) [*])
 
       if (this_image() == 1) then
 
          if (.not. allocated(gather)) &
-            allocate (gather(1:config%nx, 1:config%ny))
+            allocate (gather(config%nx, config%ny, config%nlev))
 
          ! Create output netCDF
 
@@ -64,10 +66,12 @@ contains
          call output_nc%create_axis( &
             'y', [(-.5*config%Ly + (i + .5)*config%dy, i=0, config%ny - 1)])
 
-         call output_nc%create_variable('h', ['t', 'x', 'y'])
-         call output_nc%create_variable('pt', ['t', 'x', 'y'])
-         call output_nc%create_variable('u', ['t', 'x', 'y'])
-         call output_nc%create_variable('v', ['t', 'x', 'y'])
+         call output_nc%create_axis('lev', [(i, i=1, config%nlev)])
+
+         call output_nc%create_variable('dp', ['t  ', 'x  ', 'y  ', 'lev'])
+         call output_nc%create_variable('pt', ['t  ', 'x  ', 'y  ', 'lev'])
+         call output_nc%create_variable('u', ['t  ', 'x  ', 'y  ', 'lev'])
+         call output_nc%create_variable('v', ['t  ', 'x  ', 'y  ', 'lev'])
 
       end if
 
@@ -81,21 +85,25 @@ contains
 
    subroutine accumulate_output(dt)
       real(rk), intent(in) :: dt
-      integer(ik) :: i, j
+      integer(ik) :: i, j, k
 
       do i = isd, ied
          do j = jsd, jed
-            ! height
-            call compensated_sum(dt*h(i, j), i, j, H_IDX)
+            do k = 1, config%nlev
+               ! pressure thickness
+               call compensated_sum(dt*dp(i, j, k), i, j, k, DP_IDX)
 
-            ! potential temperature
-            call compensated_sum(dt*pt(i, j), i, j, PT_IDX)
+               ! potential temperature
+               call compensated_sum(dt*pt(i, j, k), i, j, k, PT_IDX)
 
-            ! u wind
-            call compensated_sum(dt*.5*(ud(i, j) + ud(i, j + 1)), i, j, U_IDX)
+               ! u wind
+               call compensated_sum(dt*.5*(ud(i, j, k) + ud(i, j + 1, k)), &
+                                    i, j, k, U_IDX)
 
-            ! v wind
-            call compensated_sum(dt*.5*(vd(i, j) + vd(i + 1, j)), i, j, V_IDX)
+               ! v wind
+               call compensated_sum(dt*.5*(vd(i, j, k) + vd(i + 1, j, k)), &
+                                    i, j, k, V_IDX)
+            end do
          end do
       end do
 
@@ -103,15 +111,15 @@ contains
 
    end subroutine accumulate_output
 
-   subroutine compensated_sum(val, i, j, idx)
-      integer(ik), intent(in) :: i, j, idx
+   subroutine compensated_sum(val, i, j, k, idx)
+      integer(ik), intent(in) :: i, j, k, idx
       real(rk), intent(in) :: val
       real(rk) :: y, sum, c
 
-      y = val - compensation(i, j, idx)
-      sum = output_field(i, j, idx) + y
-      c = (sum - output_field(i, j, idx)) - y
-      output_field(i, j, idx) = sum
+      y = val - compensation(i, j, k, idx)
+      sum = output_field(i, j, k, idx) + y
+      c = (sum - output_field(i, j, k, idx)) - y
+      output_field(i, j, k, idx) = sum
 
    end subroutine compensated_sum
 
@@ -120,22 +128,22 @@ contains
 
       if (this_image() == 1) call output_nc%advance_time(time)
 
-      output_field(:, :, :) = output_field(:, :, :)/accumulation_time
+      output_field(:, :, :, :) = output_field(:, :, :, :)/accumulation_time
 
-      ! Output height field
-      call write (output_nc, output_field(:, :, H_IDX), 'h')
+      ! Output pressure thickness field
+      call write (output_nc, output_field(:, :, :, DP_IDX), 'dp')
 
       ! Output potential temperature field
-      call write (output_nc, output_field(:, :, PT_IDX), 'pt')
+      call write (output_nc, output_field(:, :, :, PT_IDX), 'pt')
 
       ! Output u wind
-      call write (output_nc, output_field(:, :, U_IDX), 'u')
+      call write (output_nc, output_field(:, :, :, U_IDX), 'u')
 
       ! Output v wind
-      call write (output_nc, output_field(:, :, V_IDX), 'v')
+      call write (output_nc, output_field(:, :, :, V_IDX), 'v')
 
-      output_field(:, :, :) = 0.
-      compensation(:, :, :) = 0.
+      output_field(:, :, :, :) = 0.
+      compensation(:, :, :, :) = 0.
       accumulation_time = 0.
 
    end subroutine write_output
@@ -167,15 +175,20 @@ contains
       call restart_nc%create_axis( &
          'yf', [(-.5*config%Ly + i*config%dy, i=0, config%ny - 1)])
 
-      call restart_nc%create_variable('h', ['xc', 'yc'])
-      call restart_nc%create_variable('pt', ['xc', 'yc'])
-      call restart_nc%create_variable('u', ['xc', 'yf'])
-      call restart_nc%create_variable('v', ['xf', 'yc'])
+      ! levels
+      call restart_nc%create_axis('lev', [(i, i=1, config%nlev)])
 
-      call write (restart_nc, h(isd:ied, jsd:jed), 'h')
-      call write (restart_nc, pt(isd:ied, jsd:jed), 'pt')
-      call write (restart_nc, ud(isd:ied, jsd:jed), 'u')
-      call write (restart_nc, vd(isd:ied, jsd:jed), 'v')
+      call restart_nc%create_variable('dp', ['xc ', 'yc ', 'lev'])
+      call restart_nc%create_variable('pt', ['xc ', 'yc ', 'lev'])
+      call restart_nc%create_variable('u', ['xc ', 'yf ', 'lev'])
+      call restart_nc%create_variable('v', ['xf ', 'yc ', 'lev'])
+      call restart_nc%create_variable('gzs', ['xf ', 'yc '])
+
+      call write (restart_nc, dp(isd:ied, jsd:jed, :), 'dp')
+      call write (restart_nc, pt(isd:ied, jsd:jed, :), 'pt')
+      call write (restart_nc, ud(isd:ied, jsd:jed, :), 'u')
+      call write (restart_nc, vd(isd:ied, jsd:jed, :), 'v')
+      call write (restart_nc, gz(isd:ied, jsd:jed, 1), 'gzs')
 
       call restart_nc%close()
 
@@ -183,15 +196,15 @@ contains
 
    subroutine write (netcdf, field, name)
       type(netcdf_file), intent(inout) :: netcdf
-      real(rk), intent(in) :: field(isd:ied, jsd:jed)
+      real(rk), intent(in) :: field(isd:ied, jsd:jed, config%nlev)
       character(len=*), intent(in) :: name
 
       sync all
-      gather_coarray(isd:ied, jsd:jed) [1] = field(:, :)
+      gather_coarray(isd:ied, jsd:jed, :) [1] = field(:, :, :)
       sync all
 
       if (this_image() == 1) then
-         gather(:, :) = gather_coarray(:, :)
+         gather(:, :, :) = gather_coarray(:, :, :)
          call netcdf%write_variable(name, gather)
       end if
    end subroutine write

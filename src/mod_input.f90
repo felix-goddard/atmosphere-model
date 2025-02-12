@@ -19,7 +19,7 @@ contains
 
       integer(ik) :: i, idx
       real(rk) :: dx, dy
-      integer(ik) :: xsize, ysize, dim_indices(4)
+      integer(ik) :: xsize, ysize, zsize
       character(len=:), allocatable :: names(:)
       real(rk), allocatable :: points(:)
       type(netcdf_file) :: initial_nc
@@ -28,14 +28,14 @@ contains
 
       xsize = -1
       ysize = -1
+      zsize = -1
 
       ! Check we have all the expected coordinates
 
-      names = ['xc', 'yc', 'xf', 'yf']
+      names = ['xc ', 'yc ', 'xf ', 'yf ', 'lev']
       do i = 1, size(names)
 
          idx = initial_nc%get_axis_index(names(i))
-         dim_indices(i) = idx
 
          if (idx == -1) then
             write (log_str, '(a)') 'Could not find axis `'//trim(names(i)) &
@@ -55,13 +55,25 @@ contains
                call abort_now()
             end if
 
-         else if (names(i) == 'yc' .or. names(i) == 'yf') then
+         else if (names(i) == 'yc ' .or. names(i) == 'yf ') then
 
             if (ysize == -1) then
                ysize = initial_nc%axes(idx)%size
             else if (initial_nc%axes(idx)%size /= ysize) then
                write (log_str, '(a)') &
                   'Inconsistent y axis sizes in initial condition netCDF.'
+               call logger%fatal('init_prognostic_fields', log_str)
+               call abort_now()
+            end if
+
+         else if (names(i) == 'lev') then
+
+            if (zsize == -1) then
+               zsize = initial_nc%axes(idx)%size
+            else if (initial_nc%axes(idx)%size /= zsize) then
+               write (log_str, '(a)') &
+                  'Inconsistent vertical axis sizes ' &
+                  //'in initial condition netCDF.'
                call logger%fatal('init_prognostic_fields', log_str)
                call abort_now()
             end if
@@ -73,6 +85,7 @@ contains
 
       config%nx = xsize
       config%ny = ysize
+      config%nlev = zsize
 
       points = initial_nc%read_axis('xc')
       dx = points(2) - points(1)

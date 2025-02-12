@@ -2,6 +2,7 @@ module mod_config
 
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
+   use mod_constants, only: set_constants
    use mod_util, only: abort_now, parse_duration
 
    implicit none
@@ -18,11 +19,8 @@ module mod_config
       real(rk) :: dt_max, dt_output, t_initial, t_final
 
       ! domain parameters
-      integer(ik) :: nx, ny
+      integer(ik) :: nx, ny, nlev
       real(rk) :: Lx, Ly, dx, dy
-
-      ! physics parameters
-      real(rk) :: gravity, coriolis
    end type Config
 
    type(Config) :: main_config
@@ -42,8 +40,11 @@ contains
       character(len=99) :: max_timestep, run_duration, output_interval
       namelist /time_control/ max_timestep, run_duration, output_interval
 
-      real(rk) :: g, f
-      namelist /physics_parameters/ g, f
+      real(rk) :: reference_pressure, top_pressure, gravity, &
+                  coriolis_parameter, dry_gas_constant, dry_heat_capacity
+      namelist /physics_parameters/ &
+         reference_pressure, top_pressure, gravity, &
+         coriolis_parameter, dry_gas_constant, dry_heat_capacity
 
       open (newunit=fileunit, file=filename, status='old', action='read')
 
@@ -77,8 +78,11 @@ contains
       main_config = Config( &
                     save_restart_file, initial_filename, restart_filename, &
                     dt_max, dt_output, 0, t_final, &
-                    -1, -1, -1, -1, -1, -1, &
-                    g, f)
+                    -1, -1, -1, -1, -1, -1, -1)
+
+      call set_constants( &
+         reference_pressure, top_pressure, gravity, &
+         coriolis_parameter, dry_gas_constant, dry_heat_capacity)
 
    end subroutine read_config_file
 

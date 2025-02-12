@@ -11,6 +11,10 @@
 /
 
 &physics_parameters
-    g = 9.807 ! acceleration due to gravity, m/s2
-    f = 1e-5  ! coriolis parameter, 1/s
+    reference_pressure = 100000 ! reference pressure, Pa
+    top_pressure = 26500 ! pressure at model top, Pa
+    gravity = 9.807 ! acceleration due to gravity, m/s2
+    coriolis_parameter = 1e-5  ! coriolis parameter, 1/s
+    dry_gas_constant = 287.052874 ! specific gas constant of dry air, J/kg/K
+    dry_heat_capacity = 1005 ! constant pressure heat capacity of dry air, J/kg/K
 /
