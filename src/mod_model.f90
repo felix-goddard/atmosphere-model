@@ -7,7 +7,7 @@ module mod_model
    use mod_netcdf, only: netcdf_file
    use mod_input, only: read_initial_file
    use mod_tiles, only: init_tiles
-   use mod_fields, only: init_prognostic_fields
+   use mod_fields, only: init_prognostic_fields, initial_halo_exchange
    use mod_sw_dyn, only: allocate_sw_dyn_arrays, is_stable, &
                          cgrid_dynamics_step, cgrid_halo_exchange, &
                          dgrid_dynamics_step, dgrid_halo_exchange
@@ -46,12 +46,17 @@ contains
          call logger%info('main', 'Loaded initial condition from ' &
                           //config%initial_filename)
 
-      call allocate_sw_dyn_arrays()
+      ! Allocate the sync buffers and perform the initial sync; this
+      ! synchronises the prognostic variables and gz across all processors.
+      ! We must do this before calling `allocate_sw_dyn_arrays` as that
+      ! uses the values in gz
       call allocate_sync_buffers()
 
       call timing_on('HALO EXCHANGE')
-      call dgrid_halo_exchange()
+      call initial_halo_exchange()
       call timing_off('HALO EXCHANGE')
+
+      call allocate_sw_dyn_arrays()
 
       previous_write_time = config%t_initial
       write_this_step = .false.

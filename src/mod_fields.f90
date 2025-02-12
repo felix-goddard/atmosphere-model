@@ -6,12 +6,13 @@ module mod_fields
    use mod_constants, only: top_pressure, kappa
    use mod_netcdf, only: netcdf_file, open_netcdf
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
+   use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
    implicit none
    private
 
-   public :: init_prognostic_fields
+   public :: init_prognostic_fields, initial_halo_exchange
 
    ! prognostic fields
    real(rk), public, allocatable :: dp(:, :, :) ! prognostic pressure thickness
@@ -86,8 +87,8 @@ contains
          end select
       end do
 
-      plev(:, :, config%nlev + 1) = top_pressure
-      pkap(:, :, config%nlev + 1) = top_pressure**kappa
+      plev(is:ie, js:je, config%nlev + 1) = top_pressure
+      pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
 
       idx = initial_nc%get_variable_index('gzs')
 
@@ -106,5 +107,11 @@ contains
       deallocate (values)
 
    end subroutine init_prognostic_fields
+
+   subroutine initial_halo_exchange()
+
+      call halo_exchange(dp, pt, gz, ud, vd)
+      
+   end subroutine initial_halo_exchange
 
 end module mod_fields

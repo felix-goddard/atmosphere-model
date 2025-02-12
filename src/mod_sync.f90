@@ -11,7 +11,11 @@ module mod_sync
    private
    public :: halo_exchange, allocate_sync_buffers
 
-   integer, parameter :: n_prognostics = 4
+   interface halo_exchange
+      module procedure :: halo_exchange_4arg, halo_exchange_5arg
+   end interface
+
+   integer, parameter :: max_n_args = 5
    real(rk), allocatable :: edge_buffer(:, :, :, :, :) [:]
    real(rk), allocatable :: corner_buffer(:, :, :, :, :) [:]
 
@@ -20,7 +24,7 @@ module mod_sync
    ! - across-boundary direction (1:halo_width)
    ! - vertical direction (1:nlev)
    ! - neighbour tile (1:4)
-   ! - variable (1:n_prognostics) so we can sync all prognostics at once
+   ! - variable (1:max_n_args) so we can multiple variables at once
    ! While we could do each neighbouring tile or each prognostic individually,
    ! doing it this way minimises the number of sync calls.
 
@@ -29,31 +33,51 @@ module mod_sync
    ! - across-boundary direction (1:halo_width)
    ! - vertical direction (1:nlev)
    ! - neighbour tile (1:4)
-   ! - variable (1:n_prognostics)
+   ! - variable (1:max_n_args)
 
 contains
 
-   subroutine halo_exchange(dp, pt, u, v)
-      real(rk), intent(inout) :: dp(is:ie, js:je, 1:config%nlev)
-      real(rk), intent(inout) :: pt(is:ie, js:je, 1:config%nlev)
-      real(rk), intent(inout) :: u(is:ie, js:je, 1:config%nlev)
-      real(rk), intent(inout) :: v(is:ie, js:je, 1:config%nlev)
+   subroutine halo_exchange_4arg(a, b, c, d)
+      real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: &
+         a, b, c, d
 
       sync images(set(neighbours))
 
-      call copy_to_buffer(dp, 1)
-      call copy_to_buffer(pt, 2)
-      call copy_to_buffer(u, 3)
-      call copy_to_buffer(v, 4)
+      call copy_to_buffer(a, 1)
+      call copy_to_buffer(b, 2)
+      call copy_to_buffer(c, 3)
+      call copy_to_buffer(d, 4)
 
       sync images(set(neighbours))
 
-      call copy_from_buffer(dp, 1)
-      call copy_from_buffer(pt, 2)
-      call copy_from_buffer(u, 3)
-      call copy_from_buffer(v, 4)
+      call copy_from_buffer(a, 1)
+      call copy_from_buffer(b, 2)
+      call copy_from_buffer(c, 3)
+      call copy_from_buffer(d, 4)
 
-   end subroutine halo_exchange
+   end subroutine halo_exchange_4arg
+
+   subroutine halo_exchange_5arg(a, b, c, d, e)
+      real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: &
+         a, b, c, d, e
+
+      sync images(set(neighbours))
+
+      call copy_to_buffer(a, 1)
+      call copy_to_buffer(b, 2)
+      call copy_to_buffer(c, 3)
+      call copy_to_buffer(d, 4)
+      call copy_to_buffer(e, 5)
+
+      sync images(set(neighbours))
+
+      call copy_from_buffer(a, 1)
+      call copy_from_buffer(b, 2)
+      call copy_from_buffer(c, 3)
+      call copy_from_buffer(d, 4)
+      call copy_from_buffer(e, 5)
+
+   end subroutine halo_exchange_5arg
 
    subroutine copy_to_buffer(q, idx)
       real(rk), intent(in) :: q(is:ie, js:je, 1:config%nlev)
@@ -114,11 +138,11 @@ contains
       if (.not. allocated(edge_buffer)) &
          allocate (edge_buffer( &
                    1:max(config%nx, config%ny), &
-                   halo_width, config%nlev, 4, n_prognostics) [*])
+                   halo_width, config%nlev, 4, max_n_args) [*])
 
       if (.not. allocated(corner_buffer)) &
          allocate (corner_buffer(halo_width, halo_width, config%nlev, &
-                                 4, n_prognostics) [*])
+                                 4, max_n_args) [*])
 
    end subroutine allocate_sync_buffers
 

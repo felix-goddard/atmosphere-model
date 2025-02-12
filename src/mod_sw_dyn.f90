@@ -872,7 +872,7 @@ contains
          allocate (gzb(is:ie, js:je, 1:config%nlev + 1))
 
       ! the top pressure is constant so no need to interpolate
-      pkapb(is + 4:ie - 4, js + 4:je - 4, config%nlev + 1) = top_pressure**kappa
+      pkapb(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
 
       ! the surface geopotential is constant so we can interpolate it once
       ! at the start and be done
