@@ -39,7 +39,9 @@ module mod_netcdf
       procedure :: create_time_axis, advance_time
       generic :: create_axis => create_real_axis, create_integer_axis
       procedure, private :: create_real_axis, create_integer_axis
-      procedure :: get_axis_index, read_axis
+      procedure :: get_axis_index
+      procedure, private :: read_real_axis, read_integer_axis
+      generic :: read_axis => read_real_axis, read_integer_axis
       procedure :: create_variable, get_variable_index
       generic :: write_variable => write_2d_variable, write_3d_variable
       procedure, private :: write_2d_variable, write_3d_variable
@@ -306,10 +308,10 @@ contains
 
    end function get_axis_index
 
-   function read_axis(self, name) result(values)
+   subroutine read_real_axis(self, name, values)
       class(netcdf_file), intent(in) :: self
       character(len=*), intent(in) :: name
-      integer(ik), allocatable :: values(:)
+      real(rk), intent(inout), allocatable :: values(:)
       integer(ik) :: status, idx, size, varid
 
       if (trim(self%t_axis%name) == trim(name)) then
@@ -321,12 +323,38 @@ contains
          varid = self%axes(idx)%varid
       end if
 
+      if (allocated(values)) &
+         deallocate (values)
       allocate (values(1:size))
 
       status = nf90_get_var(self%ncid, varid, values)
-      call handle_netcdf_error(status, 'read_axis')
+      call handle_netcdf_error(status, 'read_real_axis')
 
-   end function read_axis
+   end subroutine read_real_axis
+
+   subroutine read_integer_axis(self, name, values)
+      class(netcdf_file), intent(in) :: self
+      character(len=*), intent(in) :: name
+      integer(ik), intent(inout), allocatable :: values(:)
+      integer(ik) :: status, idx, size, varid
+
+      if (trim(self%t_axis%name) == trim(name)) then
+         size = self%t_axis%size
+         varid = self%t_axis%varid
+      else
+         idx = self%get_axis_index(name)
+         size = self%axes(idx)%size
+         varid = self%axes(idx)%varid
+      end if
+
+      if (allocated(values)) &
+         deallocate (values)
+      allocate (values(1:size))
+
+      status = nf90_get_var(self%ncid, varid, values)
+      call handle_netcdf_error(status, 'read_integer_axis')
+
+   end subroutine read_integer_axis
 
    subroutine create_variable(self, name, dims)
       class(netcdf_file), intent(inout) :: self

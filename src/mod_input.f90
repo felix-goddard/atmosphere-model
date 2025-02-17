@@ -8,6 +8,8 @@ module mod_input
 
    implicit none
 
+   real(rk), parameter :: tolerance = 1e-3
+
 contains
 
    function read_initial_file() result(initial_nc)
@@ -40,7 +42,7 @@ contains
          if (idx == -1) then
             write (log_str, '(a)') 'Could not find axis `'//trim(names(i)) &
                //'` in initial condition netCDF.'
-            call logger%fatal('init_prognostic_fields', log_str)
+            call logger%fatal('read_initial_file', log_str)
             call abort_now()
          end if
 
@@ -51,7 +53,7 @@ contains
             else if (initial_nc%axes(idx)%size /= xsize) then
                write (log_str, '(a)') &
                   'Inconsistent x axis sizes in initial condition netCDF.'
-               call logger%fatal('init_prognostic_fields', log_str)
+               call logger%fatal('read_initial_file', log_str)
                call abort_now()
             end if
 
@@ -62,7 +64,7 @@ contains
             else if (initial_nc%axes(idx)%size /= ysize) then
                write (log_str, '(a)') &
                   'Inconsistent y axis sizes in initial condition netCDF.'
-               call logger%fatal('init_prognostic_fields', log_str)
+               call logger%fatal('read_initial_file', log_str)
                call abort_now()
             end if
 
@@ -74,7 +76,7 @@ contains
                write (log_str, '(a)') &
                   'Inconsistent vertical axis sizes ' &
                   //'in initial condition netCDF.'
-               call logger%fatal('init_prognostic_fields', log_str)
+               call logger%fatal('read_initial_file', log_str)
                call abort_now()
             end if
 
@@ -87,26 +89,28 @@ contains
       config%ny = ysize
       config%nlev = zsize
 
-      points = initial_nc%read_axis('xc')
+      call initial_nc%read_axis('xc', points)
       dx = points(2) - points(1)
-      if (.not. all(points(2:xsize) - points(1:xsize - 1) == dx)) then
+      if (.not. all(abs(points(2:xsize) - points(1:xsize - 1)) - abs(dx) &
+                    < tolerance)) then
          write (log_str, '(a)') &
             'Spacing of x-coordinate points in initial condition netCDF ' &
             //'is not uniform.'
-         call logger%fatal('init_prognostic_fields', log_str)
+         call logger%fatal('read_initial_file', log_str)
          call abort_now()
       end if
 
       config%Lx = maxval(points) - minval(points) + dx
       config%dx = dx
 
-      points = initial_nc%read_axis('yc')
+      call initial_nc%read_axis('yc', points)
       dy = points(2) - points(1)
-      if (.not. all(points(2:ysize) - points(1:ysize - 1) == dy)) then
+      if (.not. all(abs(points(2:ysize) - points(1:ysize - 1)) - abs(dy) &
+                    < tolerance)) then
          write (log_str, '(a)') &
             'Spacing of y-coordinate points in initial condition netCDF ' &
             //'is not uniform.'
-         call logger%fatal('init_prognostic_fields', log_str)
+         call logger%fatal('read_initial_file', log_str)
          call abort_now()
       end if
 
@@ -116,11 +120,11 @@ contains
       if (initial_nc%t_axis%dimid == -1) then
          write (log_str, '(a)') &
             'Could not find axis `t` in initial condition netCDF.'
-         call logger%fatal('init_prognostic_fields', log_str)
+         call logger%fatal('read_initial_file', log_str)
          call abort_now()
       end if
 
-      points = initial_nc%read_axis('t')
+      call initial_nc%read_axis('t', points)
       config%t_initial = points(1)
       config%t_final = config%t_final + points(1)
 
