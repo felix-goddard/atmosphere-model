@@ -92,29 +92,30 @@ contains
    subroutine print_timing()
       integer(ik) :: i
       character(len=1) :: nl
-      character(len=6) :: format_str
+      character(len=8) :: format_str
 
       nl = new_line('a')
 
       write (log_str, '(a)') 'Timing information.'//nl &
-         //'Block                  n      User       Sys        Total'//nl &
-         //'------------------------------------------------------------'
-
-      do i = 1, n_blocks
-         write (log_str, '(3a,i4)') trim(log_str)//nl, &
-            adjustl(labels(i)), '   ', n_times(i)
-
-         write (format_str, '(f6.3)') usr_total_time(i)
-         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
-
-         write (format_str, '(f6.3)') sys_total_time(i)
-         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
-
-         write (format_str, '(f6.3)') usr_total_time(i) + sys_total_time(i)
-         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
-      end do
+         //'Block                  n      User         Sys          Total'//nl &
+         //'------------------------------------------------------------------'
 
       call logger%info('print_timing', log_str)
+
+      do i = 1, n_blocks
+         write (log_str, '(2a,i4)') adjustl(labels(i)), '   ', n_times(i)
+
+         write (format_str, '(f8.3)') usr_total_time(i)
+         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
+
+         write (format_str, '(f8.3)') sys_total_time(i)
+         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
+
+         write (format_str, '(f8.3)') usr_total_time(i) + sys_total_time(i)
+         write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
+
+         call logger%info('print_timing', log_str, preamble=.false.)
+      end do
 
    end subroutine print_timing
 

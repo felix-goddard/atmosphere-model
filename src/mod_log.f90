@@ -63,18 +63,23 @@ contains
 
    end subroutine init_logging
 
-   subroutine handle_message(self, level, message)
+   subroutine handle_message(self, level, message, preamble)
       class(Logger), intent(in out) :: self
       character(*), intent(in) :: message
       integer(ik), intent(in) :: level
+      logical, intent(in) :: preamble
       integer(ik) :: datetime(8)
 
       call date_and_time(values=datetime)
 
-      write (log_str, '(a,i4,2(a,i2.2),3(a,i2.2),a,i3.3,2a)') &
-         '[', datetime(1), '-', datetime(2), '-', datetime(3), &
-         ' ', datetime(5), ':', datetime(6), ':', datetime(7), &
-         '.', datetime(8), '] ', trim(message)
+      if (preamble) then
+         write (log_str, '(a,i4,2(a,i2.2),3(a,i2.2),a,i3.3,2a)') &
+            '[', datetime(1), '-', datetime(2), '-', datetime(3), &
+            ' ', datetime(5), ':', datetime(6), ':', datetime(7), &
+            '.', datetime(8), '] ', trim(message)
+      else
+         write (log_str, '(a)') trim(message)
+      end if
 
       if (level >= self%error_level) then
          write (self%error_unit, '(a)') trim(log_str)
@@ -96,48 +101,75 @@ contains
 
    end subroutine handle_message
 
-   subroutine fatal(self, source, message)
+   subroutine fatal(self, source, message, preamble)
       class(Logger), intent(in out) :: self
+      logical, intent(in), optional :: preamble
       character(*), intent(in) :: source, message
+      logical :: print_preamble
 
-      call self%handle_message( &
-         log_fatal, '['//source//'] <fatal> '//trim(message))
+      if (present(preamble) .and. .not. preamble) then
+         call self%handle_message(log_fatal, message, .false.)
+      else
+         call self%handle_message( &
+            log_fatal, '['//source//'] <fatal> '//trim(message), .true.)
+      end if
 
    end subroutine fatal
 
-   subroutine error(self, source, message)
+   subroutine error(self, source, message, preamble)
       class(Logger), intent(in out) :: self
+      logical, intent(in), optional :: preamble
       character(*), intent(in) :: source, message
+      logical :: print_preamble
 
-      call self%handle_message( &
-         log_error, '['//source//'] <error> '//trim(message))
+      if (present(preamble) .and. .not. preamble) then
+         call self%handle_message(log_error, message, .false.)
+      else
+         call self%handle_message( &
+            log_error, '['//source//'] <error> '//trim(message), .true.)
+      end if
 
    end subroutine error
 
-   subroutine warning(self, source, message)
+   subroutine warning(self, source, message, preamble)
       class(Logger), intent(in out) :: self
+      logical, intent(in), optional :: preamble
       character(*), intent(in) :: source, message
 
-      call self%handle_message( &
-         log_warning, '['//source//'] <warning> '//trim(message))
+      if (present(preamble) .and. .not. preamble) then
+         call self%handle_message(log_warning, message, .false.)
+      else
+         call self%handle_message( &
+            log_warning, '['//source//'] <warning> '//trim(message), .true.)
+      end if
 
    end subroutine warning
 
-   subroutine info(self, source, message)
+   subroutine info(self, source, message, preamble)
       class(Logger), intent(in out) :: self
+      logical, intent(in), optional :: preamble
       character(*), intent(in) :: source, message
 
-      call self%handle_message( &
-         log_info, '['//source//'] <info> '//trim(message))
+      if (present(preamble) .and. .not. preamble) then
+         call self%handle_message(log_info, message, .false.)
+      else
+         call self%handle_message( &
+            log_info, '['//source//'] <info> '//trim(message), .true.)
+      end if
 
    end subroutine info
 
-   subroutine debug(self, source, message)
+   subroutine debug(self, source, message, preamble)
       class(Logger), intent(in out) :: self
+      logical, intent(in), optional :: preamble
       character(*), intent(in) :: source, message
 
-      call self%handle_message( &
-         log_debug, '['//source//'] <debug> '//trim(message))
+      if (present(preamble) .and. .not. preamble) then
+         call self%handle_message(log_debug, message, .false.)
+      else
+         call self%handle_message( &
+            log_debug, '['//source//'] <debug> '//trim(message), .true.)
+      end if
 
    end subroutine debug
 
