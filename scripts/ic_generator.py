@@ -47,7 +47,8 @@ dry_heat_capacity = config['physics_parameters']['dry_heat_capacity']
 kappa = dry_gas_constant / dry_heat_capacity
 hydrostatic_constant = dry_heat_capacity / reference_pressure**kappa
 
-surface_temperature = 288 # K = 15 C
+surface_temperature = np.ones((ny,nx)) * 288 # K = 15 C
+
 lapse_rate = 20/3e3 # K / m
 top_height = 10e3
 
@@ -76,8 +77,8 @@ pressure[:,:,:-1] = top_pressure + np.cumsum(dp[:,:,::-1], axis=2)[:,:,::-1]
 geopotential = np.zeros((ny,nx,nlev+1))
 geopotential[:,:,0] = g * surface_height[:,:]
 geopotential[:,:,1:] = (g/lapse_rate) * (
-    surface_temperature
-    - (surface_temperature - lapse_rate * repeat_along_z(surface_height, nlev))
+    repeat_along_z(surface_temperature, nlev)
+    - repeat_along_z(surface_temperature - lapse_rate * surface_height, nlev)
     * (pressure[:,:,1:] / repeat_along_z(pressure[:,:,0], nlev))
     ** (lapse_rate*dry_gas_constant/g)
 )
@@ -102,6 +103,7 @@ xr.Dataset(
         u=(['yc', 'xf', 'lev', 't'], u[..., np.newaxis]),
         v=(['yf', 'xc', 'lev', 't'], v[..., np.newaxis]),
         gzs=(['yc', 'xc', 't'], geopotential[:,:,0, np.newaxis]),
+        ts=(['yc', 'xc', 't'], (surface_temperature[:,:])[..., np.newaxis]),
     ),
     coords=dict(
         t=('t', [0]),

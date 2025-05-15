@@ -19,6 +19,7 @@ module mod_fields
    real(rk), public, allocatable :: pt(:, :, :) ! prognostic potential temperature
    real(rk), public, allocatable :: ud(:, :, :) ! prognostic u wind (on D grid)
    real(rk), public, allocatable :: vd(:, :, :) ! prognostic v wind (on D grid)
+   real(rk), public, allocatable :: ts(:, :)    ! surface temperature
 
    ! diagnostic and auxiliary fields
    real(rk), public, allocatable :: plev(:, :, :) ! pressure on interfaces
@@ -38,6 +39,7 @@ contains
       if (.not. allocated(pt)) allocate (pt(is:ie, js:je, nlev))
       if (.not. allocated(ud)) allocate (ud(is:ie, js:je, nlev))
       if (.not. allocated(vd)) allocate (vd(is:ie, js:je, nlev))
+      if (.not. allocated(ts)) allocate (ts(is:ie, js:je))
 
       ! diagnostic and auxiliary fields
       if (.not. allocated(plev)) allocate (plev(is:ie, js:je, nlev + 1))
@@ -56,10 +58,9 @@ contains
 
       call allocate_fields()
 
-      heat_source(:, :, :) = 0.
-
       allocate (values(1:config%nx, 1:config%ny, 1:config%nlev))
 
+      ! Load 3D fields
       names = ['dp', 'pt', 'u ', 'v ']
       do i = 1, size(names)
 
@@ -87,24 +88,35 @@ contains
          end select
       end do
 
-      plev(is:ie, js:je, config%nlev + 1) = top_pressure
-      pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
+      ! Load 2D fields
+      names = ['gzs', 'ts ']
+      do i = 1, size(names)
 
-      idx = initial_nc%get_variable_index('gzs')
+         idx = initial_nc%get_variable_index(names(i))
 
-      if (idx == -1) then
-         write (log_str, '(a)') 'Could not find variable `gzs` ' &
-            //'in initial condition netCDF.'
-         call logger%fatal('init_prognostic_fields', log_str)
-         call abort_now()
-      end if
+         if (idx == -1) then
+            write (log_str, '(a)') 'Could not find variable `' &
+               //trim(names(i))//'` in initial condition netCDF.'
+            call logger%fatal('init_prognostic_fields', log_str)
+            call abort_now()
+         end if
 
-      call initial_nc%read_variable( &
-         'gzs', values(1:config%nx, 1:config%ny, 1))
+         call initial_nc%read_variable( &
+            names(i), values(1:config%nx, 1:config%ny, 1))
 
-      gz(isd:ied, jsd:jed, 1) = values(isd:ied, jsd:jed, 1)
+         select case (trim(names(i)))
+         case ('gzs')
+            gz(isd:ied, jsd:jed, 1) = values(isd:ied, jsd:jed, 1)
+         case ('ts')
+            ts(isd:ied, jsd:jed) = values(isd:ied, jsd:jed, 1)
+         end select
+      end do
 
       deallocate (values)
+
+      plev(is:ie, js:je, config%nlev + 1) = top_pressure
+      pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
+      heat_source(:, :, :) = 0.
 
    end subroutine init_prognostic_fields
 
