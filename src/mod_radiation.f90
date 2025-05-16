@@ -22,7 +22,7 @@ module mod_radiation
              radiation_halo_exchange
 
    real(rk), allocatable :: layer_temperature(:, :, :)
-   real(rk), allocatable :: interface_temperature(:, :, :)
+   real(rk), allocatable :: level_temperature(:, :, :)
 
    real(rk), allocatable :: dm(:)
    real(rk), allocatable :: flux_up(:), flux_dn(:), net_flux(:)
@@ -47,7 +47,7 @@ contains
       ! ========================================================================
       ! Calculate layer properties of the entire atmosphere
       ! This populates the arrays plev, play, plog, layer_temperature, and
-      ! interface_temperature
+      ! level_temperature
 
       do k = config%nlev, 1, -1
          plev(isd:ied, jsd:jed, k) = &
@@ -73,7 +73,7 @@ contains
             p1 = log(play(isd:ied, jsd:jed, k))
             p2 = log(play(isd:ied, jsd:jed, k + 1))
 
-            interface_temperature(isd:ied, jsd:jed, k + 1) = &
+            level_temperature(isd:ied, jsd:jed, k + 1) = &
                (layer_temperature(isd:ied, jsd:jed, k) &
                 *(p2 - plog(isd:ied, jsd:jed, k + 1)) &
                 + layer_temperature(isd:ied, jsd:jed, k + 1) &
@@ -85,7 +85,7 @@ contains
       p1 = log(play(isd:ied, jsd:jed, config%nlev - 1))
       p2 = log(play(isd:ied, jsd:jed, config%nlev))
 
-      interface_temperature(isd:ied, jsd:jed, config%nlev + 1) = &
+      level_temperature(isd:ied, jsd:jed, config%nlev + 1) = &
          (layer_temperature(isd:ied, jsd:jed, config%nlev - 1) &
           *(p2 - plog(isd:ied, jsd:jed, config%nlev + 1)) &
           + layer_temperature(isd:ied, jsd:jed, config%nlev) &
@@ -95,7 +95,7 @@ contains
       p1 = log(play(isd:ied, jsd:jed, 1))
       p2 = log(play(isd:ied, jsd:jed, 2))
 
-      interface_temperature(isd:ied, jsd:jed, 1) = &
+      level_temperature(isd:ied, jsd:jed, 1) = &
          (layer_temperature(isd:ied, jsd:jed, 1) &
           *(p2 - plog(isd:ied, jsd:jed, 1)) &
           + layer_temperature(isd:ied, jsd:jed, 2) &
@@ -137,7 +137,7 @@ contains
 
                call solve_longwave_column( &
                   g, play(i, j, :), dm(:), layer_temperature(i, j, :), &
-                  interface_temperature(i, j, :), ts(i, j), surface_emissivity)
+                  level_temperature(i, j, :), ts(i, j), surface_emissivity)
 
                upward_longwave_flux(i, j, :) = &
                   upward_longwave_flux(i, j, :) + flux_up(:)
@@ -289,14 +289,14 @@ contains
                   k_ext, k_sca, k_abs, &
                   backscatter, gamma1, gamma2, lambda, e_minus, e_2minus, &
                   coefficient, surface_planckian, planckian_difference
-      real(rk), allocatable :: interface_planckian(:)
+      real(rk), allocatable :: level_planckian(:)
       integer(ik) :: k
 
-      if (.not. allocated(interface_planckian)) &
-         allocate (interface_planckian(config%nlev + 1))
+      if (.not. allocated(level_planckian)) &
+         allocate (level_planckian(config%nlev + 1))
 
       surface_planckian = planck_function(g_point, surface_temperature)
-      interface_planckian(1) = planck_function(g_point, level_temperature(1))
+      level_planckian(1) = planck_function(g_point, level_temperature(1))
 
       do k = 1, config%nlev
 
@@ -331,22 +331,22 @@ contains
 
          ! Thermal source function (Planck function linear in optical depth)
 
-         interface_planckian(k + 1) = &
+         level_planckian(k + 1) = &
             planck_function(g_point, level_temperature(k + 1))
 
          planckian_difference = &
             (1 + reflectance(k) - transmittance(k)) &
-            *(interface_planckian(k) - interface_planckian(k + 1)) &
+            *(level_planckian(k) - level_planckian(k + 1)) &
             /(optical_thickness*(gamma1 + gamma2))
 
          source_up(k) = &
-            pi*((1 - reflectance(k))*interface_planckian(k + 1) &
-                - transmittance(k)*interface_planckian(k) &
+            pi*((1 - reflectance(k))*level_planckian(k + 1) &
+                - transmittance(k)*level_planckian(k) &
                 + planckian_difference)
 
          source_dn(k) = &
-            pi*((1 - reflectance(k))*interface_planckian(k) &
-                - transmittance(k)*interface_planckian(k + 1) &
+            pi*((1 - reflectance(k))*level_planckian(k) &
+                - transmittance(k)*level_planckian(k + 1) &
                 - planckian_difference)
 
       end do
@@ -416,8 +416,8 @@ contains
 
       if (.not. allocated(layer_temperature)) &
          allocate (layer_temperature(isd:ied, jsd:jed, config%nlev))
-      if (.not. allocated(interface_temperature)) &
-         allocate (interface_temperature(isd:ied, jsd:jed, config%nlev + 1))
+      if (.not. allocated(level_temperature)) &
+         allocate (level_temperature(isd:ied, jsd:jed, config%nlev + 1))
 
       if (.not. allocated(dm)) allocate (dm(config%nlev))
       if (.not. allocated(flux_up)) allocate (flux_up(config%nlev + 1))
