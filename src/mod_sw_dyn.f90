@@ -7,7 +7,7 @@ module mod_sw_dyn
    use mod_constants, only: gravity, coriolis_parameter, &
                             kappa, hydrostatic_constant, top_pressure
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_fields, only: dp, pt, ud, vd, plev, pkap, gz, heat_source
+   use mod_fields, only: dp, pt, ud, vd, plev, pkap, gz, pt_heating_rate
    use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
@@ -227,7 +227,7 @@ contains
             do j = js + 5, je - 5
                ptc(i, j, k) = (ptc(i, j, k) &
                                - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*heat_source(i, j, k) &
+                               + dt*dp(i, j, k)*pt_heating_rate(i, j, k) &
                                )/dpc(i, j, k)
             end do
          end do
@@ -514,7 +514,7 @@ contains
             do j = js + 4, je - 4
                ptc(i, j, k) = (ptc(i, j, k) &
                                - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*heat_source(i, j, k) &
+                               + dt*dp(i, j, k)*pt_heating_rate(i, j, k) &
                                )/dpc(i, j, k)
             end do
          end do

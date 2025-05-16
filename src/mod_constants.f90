@@ -4,6 +4,10 @@ module mod_constants
 
     implicit none
 
+    ! mathematical constants
+    real(rk), parameter :: pi = 3.1415926535897932384626433
+
+    ! model specific constants
     real(rk) :: reference_pressure
     real(rk) :: top_pressure
     real(rk) :: gravity

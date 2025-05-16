@@ -22,10 +22,15 @@ module mod_fields
    real(rk), public, allocatable :: ts(:, :)    ! surface temperature
 
    ! diagnostic and auxiliary fields
+   real(rk), public, allocatable :: play(:, :, :) ! average pressure of layers
+   real(rk), public, allocatable :: playkap(:, :, :) ! average pressure^kappa of layers
    real(rk), public, allocatable :: plev(:, :, :) ! pressure on interfaces
+   real(rk), public, allocatable :: plog(:, :, :) ! log(pressure) on interfaces
    real(rk), public, allocatable :: pkap(:, :, :) ! pressure^kappa on interfaces
    real(rk), public, allocatable :: gz(:, :, :) ! geopotential height on interfaces
-   real(rk), public, allocatable :: heat_source(:, :, :)
+
+   real(rk), public, allocatable :: heating_rate(:, :, :) ! diabatic heating rate
+   real(rk), public, allocatable :: pt_heating_rate(:, :, :) ! diabatic change in potential temperature
 
 contains
 
@@ -42,11 +47,18 @@ contains
       if (.not. allocated(ts)) allocate (ts(is:ie, js:je))
 
       ! diagnostic and auxiliary fields
+      if (.not. allocated(play)) allocate (play(is:ie, js:je, nlev))
+      if (.not. allocated(playkap)) allocate (playkap(is:ie, js:je, nlev))
       if (.not. allocated(plev)) allocate (plev(is:ie, js:je, nlev + 1))
+      if (.not. allocated(plog)) allocate (plog(is:ie, js:je, nlev + 1))
       if (.not. allocated(pkap)) allocate (pkap(is:ie, js:je, nlev + 1))
       if (.not. allocated(gz)) allocate (gz(is:ie, js:je, nlev + 1))
-      if (.not. allocated(heat_source)) &
-         allocate (heat_source(is:ie, js:je, nlev))
+
+      if (.not. allocated(heating_rate)) &
+         allocate (heating_rate(is:ie, js:je, nlev))
+
+      if (.not. allocated(pt_heating_rate)) &
+         allocate (pt_heating_rate(is:ie, js:je, nlev))
 
    end subroutine allocate_fields
 
@@ -115,15 +127,18 @@ contains
       deallocate (values)
 
       plev(is:ie, js:je, config%nlev + 1) = top_pressure
+      plog(is:ie, js:je, config%nlev + 1) = log(top_pressure)
       pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
-      heat_source(:, :, :) = 0.
+
+      heating_rate(:, :, :) = 0.
+      pt_heating_rate(:, :, :) = 0.
 
    end subroutine init_prognostic_fields
 
    subroutine initial_halo_exchange()
 
       call halo_exchange(dp, pt, gz, ud, vd)
-      
+
    end subroutine initial_halo_exchange
 
 end module mod_fields

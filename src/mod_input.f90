@@ -17,7 +17,7 @@ contains
       ! The initial conditions file should have dimensions for the
       ! cell centers and faces in the x and y directions, and variables
       ! for each of the dimensions (xc and yc for the cell centers, xf
-      ! and yf for the cell faces) and the prognostic fields (h, u, v).
+      ! and yf for the cell faces) and the prognostic fields (h, pt, u, v, ts).
 
       integer(ik) :: i, idx
       real(rk) :: dx, dy
@@ -126,7 +126,7 @@ contains
 
       call initial_nc%read_axis('t', points)
       config%t_initial = points(1)
-      config%t_final = config%t_final + points(1)
+      config%t_final = config%t_final + config%t_initial
 
    end function read_initial_file
 

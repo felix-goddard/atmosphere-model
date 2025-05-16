@@ -11,6 +11,8 @@ module mod_model
    use mod_sw_dyn, only: allocate_sw_dyn_arrays, is_stable, &
                          cgrid_dynamics_step, cgrid_halo_exchange, &
                          dgrid_dynamics_step, dgrid_halo_exchange
+   use mod_radiation, only: allocate_radiation_arrays, &
+                            calculate_radiative_heating, radiation_halo_exchange
    use mod_sync, only: halo_exchange, allocate_sync_buffers
    use mod_output, only: accumulate_output, write_output, write_restart_file
 
@@ -20,8 +22,8 @@ module mod_model
    public :: init_model, run_model
 
    type(netcdf_file) :: initial_netcdf
-   real(rk) :: previous_write_time
-   logical :: write_this_step, stable
+   real(rk) :: previous_write_time, previous_radiation_time
+   logical :: write_this_step, calculate_radiation_this_step, stable
 
 contains
 
@@ -57,9 +59,14 @@ contains
       call timing_off('HALO EXCHANGE')
 
       call allocate_sw_dyn_arrays()
+      call allocate_radiation_arrays()
+
+      previous_radiation_time = 0.0
+      calculate_radiation_this_step = .true.
 
       previous_write_time = config%t_initial
       write_this_step = .false.
+
       stable = .true.
 
       if (this_image() == 1) &
@@ -92,6 +99,18 @@ contains
       time = config%t_initial
 
       main_loop: do while (time < config%t_final)
+
+         if (calculate_radiation_this_step) then
+            call timing_on('RADIATION TOTAL')
+            call calculate_radiative_heating(time)
+            call timing_off('RADIATION TOTAL')
+
+            call timing_on('HALO EXCHANGE')
+            call radiation_halo_exchange()
+            call timing_off('HALO EXCHANGE')
+
+            calculate_radiation_this_step = .false.
+         end if
 
          n = n + 1
          dt = calculate_dt(time)
@@ -140,7 +159,6 @@ contains
             call write_output(.5*(previous_write_time + time))
             call timing_off('WRITE OUTPUT')
 
-            previous_write_time = time
             write_this_step = .false.
          end if
 
@@ -154,15 +172,26 @@ contains
 
    function calculate_dt(time) result(dt)
       real(rk), intent(in) :: time
-      real(rk) :: dt
+      real(rk) :: dt, candidate_dt(4)
+      integer(ik) :: i
+      real(rk), parameter :: time_eps = 1e-2
 
-      dt = min(config%dt_max, config%t_final - time)
+      candidate_dt = [config%dt_max, &
+                      config%t_final - time, &
+                      previous_write_time + config%dt_output - time, &
+                      previous_radiation_time + config%dt_radiation - time]
 
-      if (previous_write_time + config%dt_output <= config%t_final &
-          .and. time + dt >= previous_write_time + config%dt_output) then
+      i = minloc(candidate_dt, 1, mask=candidate_dt > 0)
+      dt = candidate_dt(i)
 
-         dt = previous_write_time + config%dt_output - time
+      if (abs(dt - candidate_dt(3)) < time_eps) then
          write_this_step = .true.
+         previous_write_time = time + dt
+      end if
+
+      if (abs(dt - candidate_dt(4)) < time_eps) then
+         calculate_radiation_this_step = .true.
+         previous_radiation_time = time + dt
       end if
 
    end function calculate_dt

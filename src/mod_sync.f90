@@ -12,7 +12,8 @@ module mod_sync
    public :: halo_exchange, allocate_sync_buffers
 
    interface halo_exchange
-      module procedure :: halo_exchange_4arg, halo_exchange_5arg
+      module procedure :: halo_exchange_1arg, halo_exchange_4arg, &
+         halo_exchange_5arg
    end interface
 
    integer, parameter :: max_n_args = 5
@@ -36,6 +37,19 @@ module mod_sync
    ! - variable (1:max_n_args)
 
 contains
+
+   subroutine halo_exchange_1arg(a)
+      real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: a
+
+      sync images(set(neighbours))
+
+      call copy_to_buffer(a, 1)
+
+      sync images(set(neighbours))
+
+      call copy_from_buffer(a, 1)
+
+   end subroutine halo_exchange_1arg
 
    subroutine halo_exchange_4arg(a, b, c, d)
       real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: &
