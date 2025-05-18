@@ -5,7 +5,7 @@ module mod_sw_dyn
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
    use mod_constants, only: gravity, coriolis_parameter, &
-                            kappa, hydrostatic_constant, top_pressure
+                            kappa, dry_heat_capacity, top_pressure
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_fields, only: dp, pt, ud, vd, plev, pkap, gz, pt_heating_rate
    use mod_sync, only: halo_exchange
@@ -251,7 +251,7 @@ contains
       do k = 1, config%nlev
          gz(is + 5:ie - 5, js + 5:je - 5, k + 1) = &
             gz(is + 5:ie - 5, js + 5:je - 5, k) &
-            + hydrostatic_constant*ptc(is + 5:ie - 5, js + 5:je - 5, k)*( &
+            + dry_heat_capacity*ptc(is + 5:ie - 5, js + 5:je - 5, k)*( &
             pkap(is + 5:ie - 5, js + 5:je - 5, k) &
             - pkap(is + 5:ie - 5, js + 5:je - 5, k + 1))
       end do
@@ -549,7 +549,7 @@ contains
       do k = 1, config%nlev
          gz(is + 4:ie - 4, js + 4:je - 4, k + 1) = &
             gz(is + 4:ie - 4, js + 4:je - 4, k) &
-            + hydrostatic_constant*pt(is + 4:ie - 4, js + 4:je - 4, k)*( &
+            + dry_heat_capacity*pt(is + 4:ie - 4, js + 4:je - 4, k)*( &
             pkap(is + 4:ie - 4, js + 4:je - 4, k) &
             - pkap(is + 4:ie - 4, js + 4:je - 4, k + 1))
 

@@ -6,9 +6,10 @@
 
 &time_control
     max_timestep = "PT30S"
-    run_duration = "P10D"
-    output_interval = "PT1H"
-    radiation_interval = "PT1H"
+    run_duration = "PT24H"
+    output_interval = "PT30M"
+    radiation_interval = "PT30M"
+    physics_interval = "PT1M"
 /
 
 &physics_parameters

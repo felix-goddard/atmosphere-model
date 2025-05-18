@@ -13,6 +13,8 @@ module mod_model
                          dgrid_dynamics_step, dgrid_halo_exchange
    use mod_radiation, only: allocate_radiation_arrays, &
                             calculate_radiative_heating, radiation_halo_exchange
+   use mod_physics, only: allocate_physics_arrays, &
+                          calculate_physics_tendencies, apply_physics_tendencies
    use mod_sync, only: halo_exchange, allocate_sync_buffers
    use mod_output, only: accumulate_output, write_output, write_restart_file
 
@@ -22,8 +24,10 @@ module mod_model
    public :: init_model, run_model
 
    type(netcdf_file) :: initial_netcdf
-   real(rk) :: previous_write_time, previous_radiation_time
-   logical :: write_this_step, calculate_radiation_this_step, stable
+   real(rk) :: previous_write_time, previous_radiation_time, &
+               previous_physics_time
+   logical :: write_this_step, calculate_radiation_this_step, &
+              calculate_physics_this_step, stable
 
 contains
 
@@ -60,9 +64,13 @@ contains
 
       call allocate_sw_dyn_arrays()
       call allocate_radiation_arrays()
+      call allocate_physics_arrays()
 
-      previous_radiation_time = 0.0
+      previous_radiation_time = config%t_initial
       calculate_radiation_this_step = .true.
+
+      previous_physics_time = config%t_initial
+      calculate_physics_this_step = .true.
 
       previous_write_time = config%t_initial
       write_this_step = .false.
@@ -121,6 +129,14 @@ contains
             call logger%info('run_model', log_str)
          end if
 
+         if (calculate_physics_this_step) then
+            call timing_on('PHYSICS')
+            call calculate_physics_tendencies()
+            call timing_off('PHYSICS')
+
+            calculate_physics_this_step = .false.
+         end if
+
          call timing_on('CGRID DYNAMICS')
          call cgrid_dynamics_step(dt/2.)
          call timing_off('CGRID DYNAMICS')
@@ -132,6 +148,10 @@ contains
          call timing_on('DGRID DYNAMICS')
          call dgrid_dynamics_step(dt)
          call timing_off('DGRID DYNAMICS')
+
+         call timing_on('PHYSICS')
+         call apply_physics_tendencies(dt)
+         call timing_off('PHYSICS')
 
          call timing_on('HALO EXCHANGE')
          call dgrid_halo_exchange()
@@ -172,14 +192,15 @@ contains
 
    function calculate_dt(time) result(dt)
       real(rk), intent(in) :: time
-      real(rk) :: dt, candidate_dt(4)
+      real(rk) :: dt, candidate_dt(5)
       integer(ik) :: i
       real(rk), parameter :: time_eps = 1e-2
 
       candidate_dt = [config%dt_max, &
                       config%t_final - time, &
                       previous_write_time + config%dt_output - time, &
-                      previous_radiation_time + config%dt_radiation - time]
+                      previous_radiation_time + config%dt_radiation - time, &
+                      previous_physics_time + config%dt_physics - time]
 
       i = minloc(candidate_dt, 1, mask=candidate_dt > 0)
       dt = candidate_dt(i)
@@ -192,6 +213,11 @@ contains
       if (abs(dt - candidate_dt(4)) < time_eps) then
          calculate_radiation_this_step = .true.
          previous_radiation_time = time + dt
+      end if
+
+      if (abs(dt - candidate_dt(5)) < time_eps) then
+         calculate_physics_this_step = .true.
+         previous_physics_time = time + dt
       end if
 
    end function calculate_dt

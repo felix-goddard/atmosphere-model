@@ -137,19 +137,19 @@ contains
       output_field(:, :, :, :) = output_field(:, :, :, :)/accumulation_time
 
       ! Output pressure thickness field
-      call write(output_nc, output_field(:, :, :, DP_IDX), 'dp')
+      call write (output_nc, output_field(:, :, :, DP_IDX), 'dp')
 
       ! Output potential temperature field
-      call write(output_nc, output_field(:, :, :, PT_IDX), 'pt')
+      call write (output_nc, output_field(:, :, :, PT_IDX), 'pt')
 
       ! Output u wind
-      call write(output_nc, output_field(:, :, :, U_IDX), 'u')
+      call write (output_nc, output_field(:, :, :, U_IDX), 'u')
 
       ! Output v wind
-      call write(output_nc, output_field(:, :, :, V_IDX), 'v')
+      call write (output_nc, output_field(:, :, :, V_IDX), 'v')
 
       ! Output surface temperature
-      call write(output_nc, output_field(:, :, 1, TS_IDX), 'ts')
+      call write (output_nc, output_field(:, :, 1, TS_IDX), 'ts')
 
       output_field(:, :, :, :) = 0.
       compensation(:, :, :, :) = 0.
@@ -197,18 +197,18 @@ contains
 
       end if
 
-      call write(restart_nc, dp(isd:ied, jsd:jed, :), 'dp')
-      call write(restart_nc, pt(isd:ied, jsd:jed, :), 'pt')
-      call write(restart_nc, ud(isd:ied, jsd:jed, :), 'u')
-      call write(restart_nc, vd(isd:ied, jsd:jed, :), 'v')
-      call write(restart_nc, gz(isd:ied, jsd:jed, 1), 'gzs')
-      call write(restart_nc, ts(isd:ied, jsd:jed), 'ts')
+      call write (restart_nc, dp(isd:ied, jsd:jed, :), 'dp')
+      call write (restart_nc, pt(isd:ied, jsd:jed, :), 'pt')
+      call write (restart_nc, ud(isd:ied, jsd:jed, :), 'u')
+      call write (restart_nc, vd(isd:ied, jsd:jed, :), 'v')
+      call write (restart_nc, gz(isd:ied, jsd:jed, 1), 'gzs')
+      call write (restart_nc, ts(isd:ied, jsd:jed), 'ts')
 
       if (this_image() == 1) call restart_nc%close()
 
    end subroutine write_restart_file
 
-   subroutine write(netcdf, field, name)
+   subroutine write (netcdf, field, name)
       type(netcdf_file), intent(inout) :: netcdf
       real(rk), intent(in) :: field(isd:ied, jsd:jed, config%nlev)
       character(len=*), intent(in) :: name
