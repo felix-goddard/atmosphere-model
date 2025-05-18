@@ -3,8 +3,7 @@ module mod_radiation
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
-   use mod_constants, only: pi, reference_pressure, kappa, gravity, &
-                            dry_heat_capacity
+   use mod_constants, only: pi, kappa, gravity, dry_heat_capacity
    use mod_tiles, only: isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
    use mod_fields, only: dp, pt, ts, play, playkap, plev, &
@@ -63,8 +62,7 @@ contains
              - plev(isd:ied, jsd:jed, k)**kappa)/(-plog)/kappa
 
          layer_temperature(isd:ied, jsd:jed, k) = &
-            pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k) &
-            /(reference_pressure**kappa)
+            pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k)
 
          ! linear interpolation of T in log p
          if (k < config%nlev) then
@@ -154,8 +152,7 @@ contains
                   (net_flux(k + 1) - net_flux(k))/(dry_heat_capacity*dm(k))
             end do
 
-            pt_heating_rate(i, j, :) = &
-               heating_rate(i, j, :)*reference_pressure**kappa/playkap(i, j, :)
+            pt_heating_rate(i, j, :) = heating_rate(i, j, :)/playkap(i, j, :)
 
          end do
       end do

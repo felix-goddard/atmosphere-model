@@ -7,32 +7,28 @@ module mod_constants
     ! mathematical constants
     real(rk), parameter :: pi = 3.1415926535897932384626433
 
+    ! physical constants
+    real(rk), parameter :: dry_gas_constant = 287.052874 ! specific gas constant of dry air, J/kg/K
+    real(rk), parameter :: dry_heat_capacity = 1005 ! constant pressure heat capacity of dry air, J/kg/K
+
     ! model specific constants
-    real(rk) :: reference_pressure
     real(rk) :: top_pressure
     real(rk) :: gravity
     real(rk) :: coriolis_parameter
-    real(rk) :: dry_gas_constant
-    real(rk) :: dry_heat_capacity
 
     ! derived constants
     real(rk) :: kappa
-    real(rk) :: hydrostatic_constant
     
 contains
 
-    subroutine set_constants(pref, ptop, g, f, R, cP)
-        real(rk), intent(in) :: pref, ptop, g, f, R, cP
+    subroutine set_constants(ptop, g, f)
+        real(rk), intent(in) :: ptop, g, f
 
-        reference_pressure = pref
         top_pressure = ptop
         gravity = g
         coriolis_parameter = f
-        dry_gas_constant = R
-        dry_heat_capacity = cP
     
         kappa = dry_gas_constant / dry_heat_capacity
-        hydrostatic_constant = dry_heat_capacity / reference_pressure**kappa
         
     end subroutine set_constants
     

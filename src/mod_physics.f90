@@ -2,8 +2,7 @@ module mod_physics
 
    use mod_kinds, only: ik, rk
    use mod_config, only: config => main_config
-   use mod_constants, only: gravity, kappa, hydrostatic_constant, &
-                            reference_pressure, dry_heat_capacity
+   use mod_constants, only: gravity, kappa, dry_heat_capacity
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_fields, only: dp, pt, ud, vd, gz, plev, pkap, playkap
 
@@ -56,7 +55,7 @@ contains
       do k = 1, config%nlev
          gz(is + 1:ie - 1, js + 1:je - 1, k + 1) = &
             gz(is + 1:ie - 1, js + 1:je - 1, k) &
-            + hydrostatic_constant*pt(is + 1:ie - 1, js + 1:je - 1, k)*( &
+            + dry_heat_capacity*pt(is + 1:ie - 1, js + 1:je - 1, k)*( &
             pkap(is + 1:ie - 1, js + 1:je - 1, k) &
             - pkap(is + 1:ie - 1, js + 1:je - 1, k + 1))
 
@@ -86,7 +85,6 @@ contains
          ! we conserve energy
 
          energy(:) = dry_heat_capacity*pt(i, j, :)*playkap(i, j, :) &
-                     /(reference_pressure**kappa) &
                      + .5*(gz(i, j, 2:) + gz(i, j, :config%nlev) &
                            + ua(i, j, :)**2 + va(i, j, :)**2)
          u_adj(:) = ua(i, j, :)
@@ -137,11 +135,10 @@ contains
             pt_adj(k) = (energy(k) - gz_adj(k) &
                          - .5*(u_adj(k)**2 + v_adj(k)**2)) &
                         /(dry_heat_capacity*playkap(i, j, k) &
-                          /(reference_pressure**kappa) &
-                          + .5*hydrostatic_constant &
+                          + .5*dry_heat_capacity &
                           *(pkap(i, j, k) - pkap(i, j, k + 1)))
 
-            gz_adj(k + 1) = gz_adj(k) + hydrostatic_constant*pt_adj(k) &
+            gz_adj(k + 1) = gz_adj(k) + dry_heat_capacity*pt_adj(k) &
                             *(pkap(i, j, k) - pkap(i, j, k + 1))
          end do
 

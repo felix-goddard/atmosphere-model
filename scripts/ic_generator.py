@@ -41,11 +41,7 @@ gzs = np.zeros((ny,nx)) # surface geopotential height
 f = config['physics_parameters']['coriolis_parameter']
 g = config['physics_parameters']['gravity']
 top_pressure = config['physics_parameters']['top_pressure']
-reference_pressure = config['physics_parameters']['reference_pressure']
-dry_gas_constant = config['physics_parameters']['dry_gas_constant']
-dry_heat_capacity = config['physics_parameters']['dry_heat_capacity']
 kappa = dry_gas_constant / dry_heat_capacity
-hydrostatic_constant = dry_heat_capacity / reference_pressure**kappa
 
 surface_temperature = np.ones((ny,nx)) * 288 # K = 15 C
 
@@ -88,7 +84,7 @@ geopotential[:,:,1:] = (g/lapse_rate) * (
 pt[:,:,:] = abs(
     np.diff(geopotential)
     / np.diff(pressure**kappa, axis=2)
-    / hydrostatic_constant)
+    / dry_heat_capacity)
 
 u[:,:,:] = 0
 v[:,:,:] = 0
