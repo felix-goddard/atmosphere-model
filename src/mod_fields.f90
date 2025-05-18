@@ -25,8 +25,7 @@ module mod_fields
    real(rk), public, allocatable :: play(:, :, :) ! average pressure of layers
    real(rk), public, allocatable :: playkap(:, :, :) ! average pressure^kappa of layers
    real(rk), public, allocatable :: plev(:, :, :) ! pressure on interfaces
-   real(rk), public, allocatable :: plog(:, :, :) ! log(pressure) on interfaces
-   real(rk), public, allocatable :: pkap(:, :, :) ! pressure^kappa on interfaces
+   real(rk), public, allocatable :: pkap(:, :, :) ! pressure^kappa on pr
    real(rk), public, allocatable :: gz(:, :, :) ! geopotential height on interfaces
 
    real(rk), public, allocatable :: heating_rate(:, :, :) ! diabatic heating rate
@@ -50,7 +49,6 @@ contains
       if (.not. allocated(play)) allocate (play(is:ie, js:je, nlev))
       if (.not. allocated(playkap)) allocate (playkap(is:ie, js:je, nlev))
       if (.not. allocated(plev)) allocate (plev(is:ie, js:je, nlev + 1))
-      if (.not. allocated(plog)) allocate (plog(is:ie, js:je, nlev + 1))
       if (.not. allocated(pkap)) allocate (pkap(is:ie, js:je, nlev + 1))
       if (.not. allocated(gz)) allocate (gz(is:ie, js:je, nlev + 1))
 
@@ -127,7 +125,6 @@ contains
       deallocate (values)
 
       plev(is:ie, js:je, config%nlev + 1) = top_pressure
-      plog(is:ie, js:je, config%nlev + 1) = log(top_pressure)
       pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
 
       heating_rate(:, :, :) = 0.

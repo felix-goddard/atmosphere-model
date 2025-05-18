@@ -7,7 +7,7 @@ module mod_radiation
                             dry_heat_capacity
    use mod_tiles, only: isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
-   use mod_fields, only: dp, pt, ts, play, playkap, plev, plog, &
+   use mod_fields, only: dp, pt, ts, play, playkap, plev, &
                          heating_rate, pt_heating_rate
    use mod_gas_optics, only: n_g_points, &
                              shortwave_absorption_coefficient, &
@@ -42,7 +42,7 @@ contains
       integer(ik) :: i, j, k, g
       real(rk), allocatable :: p1(:, :), p2(:, :)
       real(rk) :: solar_irradiance(n_g_points), solar_zenith_angle, &
-                  surface_albedo, surface_emissivity
+                  surface_albedo, surface_emissivity, plog(isd:ied, jsd:jed)
 
       ! ========================================================================
       ! Calculate layer properties of the entire atmosphere
@@ -53,16 +53,14 @@ contains
          plev(isd:ied, jsd:jed, k) = &
             plev(isd:ied, jsd:jed, k + 1) + dp(isd:ied, jsd:jed, k)
 
-         plog(isd:ied, jsd:jed, k) = log(plev(isd:ied, jsd:jed, k))
+         plog(isd:ied, jsd:jed) = &
+            log(plev(isd:ied, jsd:jed, k)/plev(isd:ied, jsd:jed, k + 1))
 
-         play(isd:ied, jsd:jed, k) = &
-            dp(isd:ied, jsd:jed, k) &
-            /(plog(isd:ied, jsd:jed, k) - plog(isd:ied, jsd:jed, k + 1))
+         play(isd:ied, jsd:jed, k) = dp(isd:ied, jsd:jed, k)/plog
 
          playkap(isd:ied, jsd:jed, k) = &
             (plev(isd:ied, jsd:jed, k + 1)**kappa &
-             - plev(isd:ied, jsd:jed, k)**kappa) &
-            /(plog(isd:ied, jsd:jed, k + 1) - plog(isd:ied, jsd:jed, k))/kappa
+             - plev(isd:ied, jsd:jed, k)**kappa)/(-plog)/kappa
 
          layer_temperature(isd:ied, jsd:jed, k) = &
             pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k) &
@@ -72,34 +70,33 @@ contains
          if (k < config%nlev) then
             p1 = log(play(isd:ied, jsd:jed, k))
             p2 = log(play(isd:ied, jsd:jed, k + 1))
+            plog = log(plev(isd:ied, jsd:jed, k + 1))
 
             level_temperature(isd:ied, jsd:jed, k + 1) = &
-               (layer_temperature(isd:ied, jsd:jed, k) &
-                *(p2 - plog(isd:ied, jsd:jed, k + 1)) &
+               (layer_temperature(isd:ied, jsd:jed, k)*(p2 - plog) &
                 + layer_temperature(isd:ied, jsd:jed, k + 1) &
-                *(plog(isd:ied, jsd:jed, k + 1) - p1))/(p2 - p1)
+                *(plog - p1))/(p2 - p1)
          end if
       end do
 
       ! linear extrapolation of T in log p for the model top
       p1 = log(play(isd:ied, jsd:jed, config%nlev - 1))
       p2 = log(play(isd:ied, jsd:jed, config%nlev))
+      plog = log(plev(isd:ied, jsd:jed, config%nlev + 1))
 
       level_temperature(isd:ied, jsd:jed, config%nlev + 1) = &
-         (layer_temperature(isd:ied, jsd:jed, config%nlev - 1) &
-          *(p2 - plog(isd:ied, jsd:jed, config%nlev + 1)) &
+         (layer_temperature(isd:ied, jsd:jed, config%nlev - 1)*(p2 - plog) &
           + layer_temperature(isd:ied, jsd:jed, config%nlev) &
-          *(plog(isd:ied, jsd:jed, config%nlev + 1) - p1))/(p2 - p1)
+          *(plog - p1))/(p2 - p1)
 
       ! linear extrapolation of T in log p for the model bottom
       p1 = log(play(isd:ied, jsd:jed, 1))
       p2 = log(play(isd:ied, jsd:jed, 2))
+      plog = log(plev(isd:ied, jsd:jed, 1))
 
       level_temperature(isd:ied, jsd:jed, 1) = &
-         (layer_temperature(isd:ied, jsd:jed, 1) &
-          *(p2 - plog(isd:ied, jsd:jed, 1)) &
-          + layer_temperature(isd:ied, jsd:jed, 2) &
-          *(plog(isd:ied, jsd:jed, 1) - p1))/(p2 - p1)
+         (layer_temperature(isd:ied, jsd:jed, 1)*(p2 - plog) &
+          + layer_temperature(isd:ied, jsd:jed, 2)*(plog - p1))/(p2 - p1)
 
       ! ========================================================================
       ! Now solve the two-stream equations; this is done one column at a time
@@ -225,7 +222,7 @@ contains
          lambda = sqrt(gamma1**2 - gamma2**2)
 
          e_minus = exp(-lambda*optical_thickness)
-         e_2minus = exp(-2.*lambda*optical_thickness)
+         e_2minus = e_minus**2
          direct_transmittance = exp(-optical_thickness/mu0)
 
          coefficient = single_scattering_albedo &
@@ -261,7 +258,7 @@ contains
          gamma2 = 2.*single_scattering_albedo*backscatter
 
          lambda = sqrt(gamma1**2 - gamma2**2)
-         e_2minus = exp(-2.*lambda*optical_thickness)
+         e_2minus = e_minus**2
          coefficient = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
 
          ! Diffuse to diffuse reflectance and transmittance
@@ -323,7 +320,7 @@ contains
 
          lambda = sqrt(gamma1**2 - gamma2**2)
          e_minus = exp(-lambda*optical_thickness)
-         e_2minus = exp(-2.*lambda*optical_thickness)
+         e_2minus = e_minus**2
          coefficient = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
 
          reflectance(k) = coefficient*gamma2*(1.-e_2minus)
