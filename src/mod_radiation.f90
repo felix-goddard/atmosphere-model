@@ -6,13 +6,14 @@ module mod_radiation
    use mod_constants, only: pi, kappa, gravity, dry_heat_capacity
    use mod_tiles, only: isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
-   use mod_fields, only: dp, pt, ts, play, playkap, plev, &
+   use mod_fields, only: dp, pt, ts, play, playkap, plev, pkap, &
                          heating_rate, pt_heating_rate
    use mod_gas_optics, only: n_g_points, &
                              shortwave_absorption_coefficient, &
                              shortwave_scattering_coefficient, &
                              longwave_absorption_coefficient, &
                              planck_function
+   use mod_solar, only: solar_irradiance, irradiance_fraction
 
    implicit none
    private
@@ -40,7 +41,7 @@ contains
       real(rk), intent(in) :: time
       integer(ik) :: i, j, k, g
       real(rk), allocatable :: p1(:, :), p2(:, :)
-      real(rk) :: solar_irradiance(n_g_points), solar_zenith_angle, &
+      real(rk) :: irradiance, solar_zenith_angle, &
                   surface_albedo, surface_emissivity, plog(isd:ied, jsd:jed)
 
       ! ========================================================================
@@ -52,14 +53,16 @@ contains
          plev(isd:ied, jsd:jed, k) = &
             plev(isd:ied, jsd:jed, k + 1) + dp(isd:ied, jsd:jed, k)
 
+         pkap(isd:ied, jsd:jed, k) = plev(isd:ied, jsd:jed, k)**kappa
+
          plog(isd:ied, jsd:jed) = &
             log(plev(isd:ied, jsd:jed, k)/plev(isd:ied, jsd:jed, k + 1))
 
          play(isd:ied, jsd:jed, k) = dp(isd:ied, jsd:jed, k)/plog
 
          playkap(isd:ied, jsd:jed, k) = &
-            (plev(isd:ied, jsd:jed, k + 1)**kappa &
-             - plev(isd:ied, jsd:jed, k)**kappa)/(-plog)/kappa
+            (pkap(isd:ied, jsd:jed, k + 1) - pkap(isd:ied, jsd:jed, k)) &
+            /(-plog*kappa)
 
          layer_temperature(isd:ied, jsd:jed, k) = &
             pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k)
@@ -100,10 +103,6 @@ contains
       ! Now solve the two-stream equations; this is done one column at a time
       ! via a loop over the whole horizontal domain
 
-      solar_irradiance = [73.930844, 39.65197942, 292.68334539, 162.57833693, &
-                          59.12113436, 33.26516681, 12.28343081, 18.03976448, &
-                          3.19370414, 3.0535271, 151.96885695, 175.27670379, &
-                          171.46006199, 119.4478371, 19.03058465, 26.01472308]
       solar_zenith_angle = 0. ! radians
       surface_albedo = .3
       surface_emissivity = .99
@@ -118,11 +117,14 @@ contains
 
             dm(:) = dp(i, j, :)/gravity
 
+            irradiance = solar_irradiance(time, i, j)
+
             do g = 1, n_g_points
 
                call solve_shortwave_column( &
                   g, play(i, j, :), dm(:), layer_temperature(i, j, :), &
-                  solar_irradiance(g), solar_zenith_angle, surface_albedo)
+                  irradiance_fraction(g)*irradiance, solar_zenith_angle, &
+                  surface_albedo)
 
                upward_shortwave_flux(i, j, :) = &
                   upward_shortwave_flux(i, j, :) + flux_up(:)
@@ -160,24 +162,23 @@ contains
    end subroutine calculate_radiative_heating
 
    subroutine solve_shortwave_column( &
-      g_point, &
-      pressure, layer_mass, temperature, &
-      solar_irradiance, solar_zenith_angle, surface_albedo)
+      g_point, pressure, layer_mass, temperature, &
+      irradiance, sza, surface_albedo)
 
       integer(ik), intent(in) :: g_point
       real(rk), intent(in) :: pressure(:), layer_mass(:), &
-                              temperature(:), solar_irradiance, &
-                              solar_zenith_angle, surface_albedo
+                              temperature(:), irradiance, &
+                              sza, surface_albedo
       real(rk) :: optical_thickness, single_scattering_albedo, asymmetry, &
                   k_ext, k_sca, k_abs, &
                   backscatter, gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, &
-                  coefficient, lambda, e_minus, e_2minus, mu0, &
+                  tmp1, tmp2, lambda, e_minus, e_2minus, mu0, asy2, lam_mu, &
                   direct_transmittance, diffuse_reflectance, &
                   diffuse_transmittance
       integer(ik) :: k
 
-      mu0 = cos(solar_zenith_angle)
-      solar_beam(config%nlev + 1) = mu0*solar_irradiance
+      mu0 = cos(sza)
+      solar_beam(config%nlev + 1) = mu0*irradiance
 
       do k = config%nlev, 1, -1
 
@@ -197,19 +198,20 @@ contains
          ! hybrid modified Eddington-delta function of Meador & Weaver (1980)
          ! with the Eddington approximation for the backscatter fraction
 
+         asy2 = asymmetry**2
+
          backscatter = (2.-3.*asymmetry*mu0)/4.
-         coefficient = 4.*(1.-(asymmetry**2)*(1.-mu0))
+         tmp1 = 4.*(1.-asy2*(1.-mu0))
 
-         gamma3 = single_scattering_albedo*asymmetry**2
+         gamma3 = single_scattering_albedo*asy2
          gamma4 = 4.*backscatter + 3.*asymmetry
+         tmp2 = 3.*asymmetry
 
-         gamma1 = (7.-3.*asymmetry**2 &
-                   - single_scattering_albedo*(4.+3.*asymmetry) &
-                   + gamma3*gamma4)/coefficient
+         gamma1 = (7.-3.*asy2 - single_scattering_albedo*(4.+tmp2) &
+                   + gamma3*gamma4)/tmp1
 
-         gamma2 = (-1.+asymmetry**2 &
-                   + single_scattering_albedo*(4.-3.*asymmetry) &
-                   + gamma3*(gamma4 - 4.))/coefficient
+         gamma2 = (-1.+asy2 + single_scattering_albedo*(4.-tmp2) &
+                   + gamma3*(gamma4 - 4.))/tmp1
 
          gamma3 = backscatter
          gamma4 = 1.-gamma3
@@ -218,28 +220,29 @@ contains
          alpha2 = gamma2*gamma3 + gamma2*gamma4
          lambda = sqrt(gamma1**2 - gamma2**2)
 
+         lam_mu = lambda*mu0
          e_minus = exp(-lambda*optical_thickness)
          e_2minus = e_minus**2
          direct_transmittance = exp(-optical_thickness/mu0)
 
-         coefficient = single_scattering_albedo &
-                       /((1.-(lambda*mu0)**2) &
-                         *(lambda + gamma1 + (lambda - gamma1)*e_2minus))
+         tmp1 = single_scattering_albedo &
+                /((1.-lam_mu**2) &
+                  *(lambda + gamma1 + (lambda - gamma1)*e_2minus))
 
          ! Direct to diffuse upward
+         tmp2 = lambda*gamma3
          diffuse_reflectance = &
-            coefficient*( &
-            (1.-lambda*mu0)*(alpha2 + lambda*gamma3) &
-            - (1.+lambda*mu0)*(alpha2 - lambda*gamma3)*e_2minus &
+            tmp1*( &
+            (1.-lam_mu)*(alpha2 + tmp2) - (1.+lam_mu)*(alpha2 - tmp2)*e_2minus &
             - 2.*lambda*(gamma3 - alpha2*mu0)*e_minus*direct_transmittance)
 
          ! Direct to diffuse downward
+         tmp2 = lambda*gamma4
          diffuse_transmittance = &
-            coefficient*( &
-            2.*lambda*(gamma4 + alpha1*mu0)*e_minus &
-            - direct_transmittance*( &
-            (1.+lambda*mu0)*(alpha1 + lambda*gamma4) &
-            - (1.-lambda*mu0)*(alpha1 - lambda*gamma4)*e_2minus))
+            tmp1*(2.*lambda*(gamma4 + alpha1*mu0)*e_minus &
+                  - direct_transmittance*( &
+                  (1.+lam_mu)*(alpha1 + tmp2) &
+                  - (1.-lam_mu)*(alpha1 - tmp2)*e_2minus))
 
          solar_beam(k) = direct_transmittance*solar_beam(k + 1)
          source_up(k) = diffuse_reflectance*solar_beam(k + 1)
@@ -256,11 +259,11 @@ contains
 
          lambda = sqrt(gamma1**2 - gamma2**2)
          e_2minus = e_minus**2
-         coefficient = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
+         tmp1 = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
 
          ! Diffuse to diffuse reflectance and transmittance
-         reflectance(k) = coefficient*gamma2*(1.-e_2minus)
-         transmittance(k) = 2.*coefficient*lambda*e_minus
+         reflectance(k) = tmp1*gamma2*(1.-e_2minus)
+         transmittance(k) = 2.*tmp1*lambda*e_minus
 
       end do
 
@@ -271,8 +274,7 @@ contains
    end subroutine solve_shortwave_column
 
    subroutine solve_longwave_column( &
-      g_point, &
-      pressure, layer_mass, temperature, &
+      g_point, pressure, layer_mass, temperature, &
       level_temperature, surface_temperature, surface_emissivity)
 
       integer(ik), intent(in) :: g_point
@@ -282,7 +284,7 @@ contains
       real(rk) :: optical_thickness, single_scattering_albedo, asymmetry, &
                   k_ext, k_sca, k_abs, &
                   backscatter, gamma1, gamma2, lambda, e_minus, e_2minus, &
-                  coefficient, surface_planckian, planckian_difference
+                  tmp1, surface_planckian, planckian_difference
       real(rk), allocatable :: level_planckian(:)
       integer(ik) :: k
 
@@ -318,10 +320,10 @@ contains
          lambda = sqrt(gamma1**2 - gamma2**2)
          e_minus = exp(-lambda*optical_thickness)
          e_2minus = e_minus**2
-         coefficient = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
+         tmp1 = 1./(lambda + gamma1 + (lambda - gamma1)*e_2minus)
 
-         reflectance(k) = coefficient*gamma2*(1.-e_2minus)
-         transmittance(k) = 2.*coefficient*lambda*e_minus
+         reflectance(k) = tmp1*gamma2*(1.-e_2minus)
+         transmittance(k) = 2.*tmp1*lambda*e_minus
 
          ! Thermal source function (Planck function linear in optical depth)
 
@@ -329,17 +331,19 @@ contains
             planck_function(g_point, level_temperature(k + 1))
 
          planckian_difference = &
-            (1 + reflectance(k) - transmittance(k)) &
+            (1.+reflectance(k) - transmittance(k)) &
             *(level_planckian(k) - level_planckian(k + 1)) &
             /(optical_thickness*(gamma1 + gamma2))
 
+         tmp1 = 1.-reflectance(k)
+
          source_up(k) = &
-            pi*((1 - reflectance(k))*level_planckian(k + 1) &
+            pi*(tmp1*level_planckian(k + 1) &
                 - transmittance(k)*level_planckian(k) &
                 + planckian_difference)
 
          source_dn(k) = &
-            pi*((1 - reflectance(k))*level_planckian(k) &
+            pi*(tmp1*level_planckian(k) &
                 - transmittance(k)*level_planckian(k + 1) &
                 - planckian_difference)
 

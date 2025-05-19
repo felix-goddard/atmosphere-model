@@ -31,6 +31,8 @@ module mod_fields
    real(rk), public, allocatable :: heating_rate(:, :, :) ! diabatic heating rate
    real(rk), public, allocatable :: pt_heating_rate(:, :, :) ! diabatic change in potential temperature
 
+   real(rk), public, allocatable :: radius(:, :)
+
 contains
 
    subroutine allocate_fields()
@@ -58,11 +60,13 @@ contains
       if (.not. allocated(pt_heating_rate)) &
          allocate (pt_heating_rate(is:ie, js:je, nlev))
 
+      if (.not. allocated(radius)) allocate (radius(is:ie, js:je))
+
    end subroutine allocate_fields
 
    subroutine init_prognostic_fields(initial_nc)
       type(netcdf_file), intent(in) :: initial_nc
-      real(rk), allocatable :: values(:, :, :)
+      real(rk), allocatable :: values(:, :, :), coord_points(:)
       character(len=:), allocatable :: names(:)
       integer(ik) :: i, idx, j, x, y
 
@@ -129,6 +133,18 @@ contains
 
       heating_rate(:, :, :) = 0.
       pt_heating_rate(:, :, :) = 0.
+
+      call initial_nc%read_axis('xc', coord_points)
+      do j = js, je
+         radius(is:ie, j) = coord_points(is:ie)**2
+      end do
+
+      call initial_nc%read_axis('yc', coord_points)
+      do i = is, ie
+         radius(i, js:je) = radius(i, js:je) + coord_points(js:je)**2
+      end do
+
+      radius(:, :) = sqrt(radius(:, :))
 
    end subroutine init_prognostic_fields
 

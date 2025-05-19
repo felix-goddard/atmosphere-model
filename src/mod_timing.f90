@@ -96,14 +96,15 @@ contains
 
       nl = new_line('a')
 
-      write (log_str, '(a)') 'Timing information.'//nl &
-         //'Block                  n      User         Sys          Total'//nl &
-         //'------------------------------------------------------------------'
+      write (log_str, '(a)') 'Timing information.'//nl// &
+         'Block                  n        User         Sys          Total'// &
+         nl// &
+         '--------------------------------------------------------------------'
 
       call logger%info('print_timing', log_str)
 
       do i = 1, n_blocks
-         write (log_str, '(2a,i4)') adjustl(labels(i)), '   ', n_times(i)
+         write (log_str, '(2a,i6)') adjustl(labels(i)), '   ', n_times(i)
 
          write (format_str, '(f8.3)') usr_total_time(i)
          write (log_str, '(a)') trim(log_str)//'   '//adjustl(format_str)//' s'
