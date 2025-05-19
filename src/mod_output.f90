@@ -137,19 +137,19 @@ contains
       output_field(:, :, :, :) = output_field(:, :, :, :)/accumulation_time
 
       ! Output pressure thickness field
-      call write (output_nc, output_field(:, :, :, DP_IDX), 'dp')
+      call write_3d (output_nc, output_field(:, :, :, DP_IDX), 'dp')
 
       ! Output potential temperature field
-      call write (output_nc, output_field(:, :, :, PT_IDX), 'pt')
+      call write_3d (output_nc, output_field(:, :, :, PT_IDX), 'pt')
 
       ! Output u wind
-      call write (output_nc, output_field(:, :, :, U_IDX), 'u')
+      call write_3d (output_nc, output_field(:, :, :, U_IDX), 'u')
 
       ! Output v wind
-      call write (output_nc, output_field(:, :, :, V_IDX), 'v')
+      call write_3d (output_nc, output_field(:, :, :, V_IDX), 'v')
 
       ! Output surface temperature
-      call write (output_nc, output_field(:, :, 1, TS_IDX), 'ts')
+      call write_2d (output_nc, output_field(:, :, 1, TS_IDX), 'ts')
 
       output_field(:, :, :, :) = 0.
       compensation(:, :, :, :) = 0.
@@ -197,18 +197,18 @@ contains
 
       end if
 
-      call write (restart_nc, dp(isd:ied, jsd:jed, :), 'dp')
-      call write (restart_nc, pt(isd:ied, jsd:jed, :), 'pt')
-      call write (restart_nc, ud(isd:ied, jsd:jed, :), 'u')
-      call write (restart_nc, vd(isd:ied, jsd:jed, :), 'v')
-      call write (restart_nc, gz(isd:ied, jsd:jed, 1), 'gzs')
-      call write (restart_nc, ts(isd:ied, jsd:jed), 'ts')
+      call write_3d (restart_nc, dp(isd:ied, jsd:jed, :), 'dp')
+      call write_3d (restart_nc, pt(isd:ied, jsd:jed, :), 'pt')
+      call write_3d (restart_nc, ud(isd:ied, jsd:jed, :), 'u')
+      call write_3d (restart_nc, vd(isd:ied, jsd:jed, :), 'v')
+      call write_2d (restart_nc, gz(isd:ied, jsd:jed, 1), 'gzs')
+      call write_2d (restart_nc, ts(isd:ied, jsd:jed), 'ts')
 
       if (this_image() == 1) call restart_nc%close()
 
    end subroutine write_restart_file
 
-   subroutine write (netcdf, field, name)
+   subroutine write_3d (netcdf, field, name)
       type(netcdf_file), intent(inout) :: netcdf
       real(rk), intent(in) :: field(isd:ied, jsd:jed, config%nlev)
       character(len=*), intent(in) :: name
@@ -221,6 +221,21 @@ contains
          gather(:, :, :) = gather_coarray(:, :, :)
          call netcdf%write_variable(name, gather)
       end if
-   end subroutine write
+   end subroutine write_3d
+
+   subroutine write_2d (netcdf, field, name)
+      type(netcdf_file), intent(inout) :: netcdf
+      real(rk), intent(in) :: field(isd:ied, jsd:jed)
+      character(len=*), intent(in) :: name
+
+      sync all
+      gather_coarray(isd:ied, jsd:jed, 1) [1] = field(:, :)
+      sync all
+
+      if (this_image() == 1) then
+         gather(:, :, 1) = gather_coarray(:, :, 1)
+         call netcdf%write_variable(name, gather(:, :, 1))
+      end if
+   end subroutine write_2d
 
 end module mod_output
