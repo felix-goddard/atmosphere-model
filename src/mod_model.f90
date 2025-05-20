@@ -13,7 +13,7 @@ module mod_model
                          dgrid_dynamics_step, dgrid_halo_exchange
    use mod_radiation, only: allocate_radiation_arrays, &
                             calculate_radiative_heating, radiation_halo_exchange
-   use mod_physics, only: allocate_physics_arrays, &
+   use mod_physics, only: allocate_physics_arrays, physics_halo_exchange, &
                           calculate_physics_tendencies, apply_physics_tendencies
    use mod_sync, only: halo_exchange, allocate_sync_buffers
    use mod_output, only: accumulate_output, write_output, write_restart_file
@@ -155,6 +155,7 @@ contains
 
          call timing_on('HALO EXCHANGE')
          call dgrid_halo_exchange()
+         call physics_halo_exchange()
          call timing_off('HALO EXCHANGE')
 
          stable = is_stable()

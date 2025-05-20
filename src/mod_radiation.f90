@@ -6,8 +6,7 @@ module mod_radiation
    use mod_constants, only: pi, kappa, gravity, dry_heat_capacity
    use mod_tiles, only: isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
-   use mod_fields, only: dp, pt, ts, play, playkap, plev, pkap, &
-                         heating_rate, pt_heating_rate
+   use mod_fields, only: dp, pt, ts, play, playkap, plev, pkap, net_flux
    use mod_gas_optics, only: n_g_points, &
                              shortwave_absorption_coefficient, &
                              shortwave_scattering_coefficient, &
@@ -21,19 +20,19 @@ module mod_radiation
    public :: allocate_radiation_arrays, calculate_radiative_heating, &
              radiation_halo_exchange
 
-   real(rk), allocatable :: layer_temperature(:, :, :)
-   real(rk), allocatable :: level_temperature(:, :, :)
-
-   real(rk), allocatable :: dm(:)
-   real(rk), allocatable :: flux_up(:), flux_dn(:), net_flux(:)
-   real(rk), allocatable :: transmittance(:), reflectance(:)
-   real(rk), allocatable :: albedo(:), emission_up(:), beta(:)
-   real(rk), allocatable :: source_up(:), source_dn(:), solar_beam(:)
-
    real(rk), allocatable :: upward_longwave_flux(:, :, :)
    real(rk), allocatable :: downward_longwave_flux(:, :, :)
    real(rk), allocatable :: upward_shortwave_flux(:, :, :)
    real(rk), allocatable :: downward_shortwave_flux(:, :, :)
+
+   real(rk), allocatable :: layer_temperature(:, :, :)
+   real(rk), allocatable :: level_temperature(:, :, :)
+
+   real(rk), allocatable :: dm(:)
+   real(rk), allocatable :: flux_up(:), flux_dn(:)
+   real(rk), allocatable :: transmittance(:), reflectance(:)
+   real(rk), allocatable :: albedo(:), emission_up(:), beta(:)
+   real(rk), allocatable :: source_up(:), source_dn(:), solar_beam(:)
 
 contains
 
@@ -144,18 +143,10 @@ contains
 
             end do
 
-            net_flux(:) = (downward_shortwave_flux(i, j, :) &
-                           + downward_longwave_flux(i, j, :)) &
-                          - (upward_shortwave_flux(i, j, :) &
-                             + upward_longwave_flux(i, j, :))
-
-            do k = 1, config%nlev
-               heating_rate(i, j, k) = &
-                  (net_flux(k + 1) - net_flux(k))/(dry_heat_capacity*dm(k))
-            end do
-
-            pt_heating_rate(i, j, :) = heating_rate(i, j, :)/playkap(i, j, :)
-
+            net_flux(i, j, :) = (downward_shortwave_flux(i, j, :) &
+                                 + downward_longwave_flux(i, j, :)) &
+                                - (upward_shortwave_flux(i, j, :) &
+                                   + upward_longwave_flux(i, j, :))
          end do
       end do
 
@@ -406,29 +397,11 @@ contains
 
    subroutine radiation_halo_exchange()
 
-      call halo_exchange(pt_heating_rate)
+      call halo_exchange(net_flux)
 
    end subroutine radiation_halo_exchange
 
    subroutine allocate_radiation_arrays()
-
-      if (.not. allocated(layer_temperature)) &
-         allocate (layer_temperature(isd:ied, jsd:jed, config%nlev))
-      if (.not. allocated(level_temperature)) &
-         allocate (level_temperature(isd:ied, jsd:jed, config%nlev + 1))
-
-      if (.not. allocated(dm)) allocate (dm(config%nlev))
-      if (.not. allocated(flux_up)) allocate (flux_up(config%nlev + 1))
-      if (.not. allocated(flux_dn)) allocate (flux_dn(config%nlev + 1))
-      if (.not. allocated(net_flux)) allocate (net_flux(config%nlev + 1))
-      if (.not. allocated(transmittance)) allocate (transmittance(config%nlev))
-      if (.not. allocated(reflectance)) allocate (reflectance(config%nlev))
-      if (.not. allocated(albedo)) allocate (albedo(config%nlev + 1))
-      if (.not. allocated(emission_up)) allocate (emission_up(config%nlev + 1))
-      if (.not. allocated(beta)) allocate (beta(config%nlev))
-      if (.not. allocated(source_up)) allocate (source_up(config%nlev + 1))
-      if (.not. allocated(source_dn)) allocate (source_dn(config%nlev + 1))
-      if (.not. allocated(solar_beam)) allocate (solar_beam(config%nlev + 1))
 
       if (.not. allocated(upward_longwave_flux)) &
          allocate (upward_longwave_flux(isd:ied, jsd:jed, config%nlev + 1))
@@ -438,6 +411,23 @@ contains
          allocate (upward_shortwave_flux(isd:ied, jsd:jed, config%nlev + 1))
       if (.not. allocated(downward_shortwave_flux)) &
          allocate (downward_shortwave_flux(isd:ied, jsd:jed, config%nlev + 1))
+
+      if (.not. allocated(layer_temperature)) &
+         allocate (layer_temperature(isd:ied, jsd:jed, config%nlev))
+      if (.not. allocated(level_temperature)) &
+         allocate (level_temperature(isd:ied, jsd:jed, config%nlev + 1))
+
+      if (.not. allocated(dm)) allocate (dm(config%nlev))
+      if (.not. allocated(flux_up)) allocate (flux_up(config%nlev + 1))
+      if (.not. allocated(flux_dn)) allocate (flux_dn(config%nlev + 1))
+      if (.not. allocated(transmittance)) allocate (transmittance(config%nlev))
+      if (.not. allocated(reflectance)) allocate (reflectance(config%nlev))
+      if (.not. allocated(albedo)) allocate (albedo(config%nlev + 1))
+      if (.not. allocated(emission_up)) allocate (emission_up(config%nlev + 1))
+      if (.not. allocated(beta)) allocate (beta(config%nlev))
+      if (.not. allocated(source_up)) allocate (source_up(config%nlev + 1))
+      if (.not. allocated(source_dn)) allocate (source_dn(config%nlev + 1))
+      if (.not. allocated(solar_beam)) allocate (solar_beam(config%nlev + 1))
 
    end subroutine allocate_radiation_arrays
 

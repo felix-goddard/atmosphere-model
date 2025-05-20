@@ -28,8 +28,7 @@ module mod_fields
    real(rk), public, allocatable :: pkap(:, :, :) ! pressure^kappa on pr
    real(rk), public, allocatable :: gz(:, :, :) ! geopotential height on interfaces
 
-   real(rk), public, allocatable :: heating_rate(:, :, :) ! diabatic heating rate
-   real(rk), public, allocatable :: pt_heating_rate(:, :, :) ! diabatic change in potential temperature
+   real(rk), public, allocatable :: net_flux(:, :, :) ! net radiative flux (W/m2)
 
    real(rk), public, allocatable :: radius(:, :)
 
@@ -54,11 +53,7 @@ contains
       if (.not. allocated(pkap)) allocate (pkap(is:ie, js:je, nlev + 1))
       if (.not. allocated(gz)) allocate (gz(is:ie, js:je, nlev + 1))
 
-      if (.not. allocated(heating_rate)) &
-         allocate (heating_rate(is:ie, js:je, nlev))
-
-      if (.not. allocated(pt_heating_rate)) &
-         allocate (pt_heating_rate(is:ie, js:je, nlev))
+      if (.not. allocated(net_flux)) allocate (net_flux(is:ie, js:je, nlev + 1))
 
       if (.not. allocated(radius)) allocate (radius(is:ie, js:je))
 
@@ -130,9 +125,6 @@ contains
 
       plev(is:ie, js:je, config%nlev + 1) = top_pressure
       pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
-
-      heating_rate(:, :, :) = 0.
-      pt_heating_rate(:, :, :) = 0.
 
       call initial_nc%read_axis('xc', coord_points)
       do j = js, je

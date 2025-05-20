@@ -7,7 +7,7 @@ module mod_sw_dyn
    use mod_constants, only: gravity, coriolis_parameter, &
                             kappa, dry_heat_capacity, top_pressure
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_fields, only: dp, pt, ud, vd, plev, pkap, gz, pt_heating_rate
+   use mod_fields, only: dp, pt, ud, vd, plev, pkap, playkap, gz, net_flux
    use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
@@ -28,6 +28,8 @@ module mod_sw_dyn
 
    real(rk), allocatable :: pgfx(:, :), pgfy(:, :) ! pressure gradient forces
    real(rk), allocatable :: pkapb(:, :, :), gzb(:, :, :) ! pkap and gz interpolated to B grid
+
+   real(rk), allocatable :: heating_rate(:, :, :) ! potential temperature heating rate (K/s)
 
    real(rk), allocatable :: ua(:, :) ! u wind on A grid
    real(rk), allocatable :: va(:, :) ! v wind on A grid
@@ -88,7 +90,29 @@ contains
       dtdy = dt/config%dy
       rA = 1./(config%dx*config%dy)
 
+      ! calculate pressure on the layer interfaces
+      do k = config%nlev, 1, -1
+         plev(is:ie, js:je, k) = &
+            plev(is:ie, js:je, k + 1) &
+            + dp(is:ie, js:je, k)
+
+         pkap(is:ie, js:je, k) = &
+            plev(is:ie, js:je, k)**kappa
+      end do
+
       do k = 1, config%nlev
+
+         ! Calculate the rate of change of potential temperature for this layer.
+         ! We only need this over is+4:ie-4 (and same for j) because that's the
+         ! range that the D grid potential temperature gets updated on
+         playkap(is:ie, js:je, k) = &
+            (pkap(is:ie, js:je, k + 1) - pkap(is:ie, js:je, k)) &
+            /(log(plev(is:ie, js:je, k + 1)/plev(is:ie, js:je, k))*kappa)
+
+         heating_rate(is:ie, js:je, k) = &
+            (net_flux(is:ie, js:je, k + 1) - net_flux(is:ie, js:je, k)) &
+            /(dry_heat_capacity*dp(is:ie, js:je, k)/gravity) &
+            /playkap(is:ie, js:je, k)
 
          ! Calculate the winds
          do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
@@ -174,7 +198,7 @@ contains
                dpc(i, j, k) = dpc(i, j, k) - ( &
                               fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
             end do
-            dpfy(je - 4, j) = fy(je - 4)*cy(i, je - 4)
+            dpfy(i, je - 4) = fy(je - 4)*cy(i, je - 4)
          end do
 
          ! ===========================================================================
@@ -227,7 +251,7 @@ contains
             do j = js + 5, je - 5
                ptc(i, j, k) = (ptc(i, j, k) &
                                - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*pt_heating_rate(i, j, k) &
+                               + dt*dp(i, j, k)*heating_rate(i, j, k) &
                                )/dpc(i, j, k)
             end do
          end do
@@ -512,9 +536,11 @@ contains
                       variant=PPM_NONNEGATIVE)
 
             do j = js + 4, je - 4
+               ! We re-use the heating rate we calculated in the C grid step,
+               ! since it probably hasn't changed much
                ptc(i, j, k) = (ptc(i, j, k) &
                                - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*pt_heating_rate(i, j, k) &
+                               + dt*dp(i, j, k)*heating_rate(i, j, k) &
                                )/dpc(i, j, k)
             end do
          end do
@@ -863,6 +889,9 @@ contains
       if (.not. allocated(vorticity)) allocate (vorticity(is:ie, js:je))
       if (.not. allocated(kinetic_energy)) &
          allocate (kinetic_energy(is:ie, js:je))
+
+      if (.not. allocated(heating_rate)) &
+         allocate (heating_rate(is:ie, js:je, 1:config%nlev))
 
       if (.not. allocated(pgfx)) allocate (pgfx(is:ie, js:je))
       if (.not. allocated(pgfy)) allocate (pgfy(is:ie, js:je))

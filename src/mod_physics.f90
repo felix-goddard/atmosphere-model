@@ -4,18 +4,20 @@ module mod_physics
    use mod_config, only: config => main_config
    use mod_constants, only: gravity, kappa, dry_heat_capacity
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_fields, only: dp, pt, ud, vd, gz, plev, pkap, playkap
+   use mod_sync, only: halo_exchange
+   use mod_fields, only: dp, pt, ud, vd, ts, gz, plev, pkap, playkap, net_flux
 
    implicit none
    private
 
-   public :: allocate_physics_arrays, &
+   public :: allocate_physics_arrays, physics_halo_exchange, &
              calculate_physics_tendencies, apply_physics_tendencies
 
    real(rk), allocatable :: dp_tend(:, :, :) ! pressure thickness tendency
    real(rk), allocatable :: pt_tend(:, :, :) ! potential temperature tendency
    real(rk), allocatable :: u_tend(:, :, :) ! u wind tendency (on A grid)
    real(rk), allocatable :: v_tend(:, :, :) ! u wind tendency (on A grid)
+   real(rk), allocatable :: ts_tend(:, :) ! surface temperature tendency
 
    real(rk), allocatable :: ua(:, :, :) ! u wind on A grid
    real(rk), allocatable :: va(:, :, :) ! v wind on A grid
@@ -67,6 +69,8 @@ contains
       end do
 
       call dry_convective_adjustment()
+
+      call surface_heating()
 
    end subroutine calculate_physics_tendencies
 
@@ -148,13 +152,29 @@ contains
 
    end subroutine dry_convective_adjustment
 
+   subroutine surface_heating()
+      real(rk), parameter :: surface_heat_capacity = 41680*5 ! heat capacity of 5 meters of water, J/m^2/K
+
+      ts_tend(isd:ied, jsd:jed) = &
+         net_flux(isd:ied, jsd:jed, 1)/surface_heat_capacity
+
+   end subroutine surface_heating
+
    subroutine apply_physics_tendencies(dt)
       real(rk), intent(in) :: dt
 
       dp(isd:ied, jsd:jed, :) = dp(isd:ied, jsd:jed, :) + dt*dp_tend(:, :, :)
       pt(isd:ied, jsd:jed, :) = pt(isd:ied, jsd:jed, :) + dt*pt_tend(:, :, :)
 
+      ts(isd:ied, jsd:jed) = ts(isd:ied, jsd:jed) + dt*ts_tend(:, :)
+
    end subroutine apply_physics_tendencies
+
+   subroutine physics_halo_exchange()
+   
+      call halo_exchange(ts)
+      
+   end subroutine physics_halo_exchange
 
    subroutine allocate_physics_arrays()
 
@@ -166,6 +186,7 @@ contains
          allocate (u_tend(isd:ied, jsd:jed, config%nlev))
       if (.not. allocated(v_tend)) &
          allocate (v_tend(isd:ied, jsd:jed, config%nlev))
+      if (.not. allocated(ts_tend)) allocate (ts_tend(isd:ied, jsd:jed))
 
       if (.not. allocated(ua)) allocate (ua(is:ie, js:je, config%nlev))
       if (.not. allocated(va)) allocate (va(is:ie, js:je, config%nlev))

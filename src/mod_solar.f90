@@ -30,7 +30,7 @@ contains
 
       !   irradiance = 1370.
 
-      irradiance = 1350.*(1.+.05/(1.+(radius(i, j)/34000e3)**2))
+      irradiance = 600*(1.+.2/(1.+(radius(i, j)/100000e3)**2))
 
    end function solar_irradiance
 
