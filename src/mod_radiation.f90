@@ -48,7 +48,7 @@ contains
       ! This populates the arrays plev, play, plog, layer_temperature, and
       ! level_temperature
 
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
          plev(isd:ied, jsd:jed, k) = &
             plev(isd:ied, jsd:jed, k + 1) + dp(isd:ied, jsd:jed, k)
 
@@ -67,7 +67,7 @@ contains
             pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k)
 
          ! linear interpolation of T in log p
-         if (k < config%nlev) then
+         if (k < config%nlay) then
             p1 = log(play(isd:ied, jsd:jed, k))
             p2 = log(play(isd:ied, jsd:jed, k + 1))
             plog = log(plev(isd:ied, jsd:jed, k + 1))
@@ -80,13 +80,13 @@ contains
       end do
 
       ! linear extrapolation of T in log p for the model top
-      p1 = log(play(isd:ied, jsd:jed, config%nlev - 1))
-      p2 = log(play(isd:ied, jsd:jed, config%nlev))
-      plog = log(plev(isd:ied, jsd:jed, config%nlev + 1))
+      p1 = log(play(isd:ied, jsd:jed, config%nlay - 1))
+      p2 = log(play(isd:ied, jsd:jed, config%nlay))
+      plog = log(plev(isd:ied, jsd:jed, config%nlay + 1))
 
-      level_temperature(isd:ied, jsd:jed, config%nlev + 1) = &
-         (layer_temperature(isd:ied, jsd:jed, config%nlev - 1)*(p2 - plog) &
-          + layer_temperature(isd:ied, jsd:jed, config%nlev) &
+      level_temperature(isd:ied, jsd:jed, config%nlay + 1) = &
+         (layer_temperature(isd:ied, jsd:jed, config%nlay - 1)*(p2 - plog) &
+          + layer_temperature(isd:ied, jsd:jed, config%nlay) &
           *(plog - p1))/(p2 - p1)
 
       ! linear extrapolation of T in log p for the model bottom
@@ -169,9 +169,9 @@ contains
       integer(ik) :: k
 
       mu0 = cos(sza)
-      solar_beam(config%nlev + 1) = mu0*irradiance
+      solar_beam(config%nlay + 1) = mu0*irradiance
 
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
 
          k_abs = shortwave_absorption_coefficient( &
                  g_point, pressure(k), temperature(k))
@@ -258,7 +258,7 @@ contains
 
       end do
 
-      call calculate_fluxes(solar_beam(config%nlev + 1), 0._rk, surface_albedo)
+      call calculate_fluxes(solar_beam(config%nlay + 1), 0._rk, surface_albedo)
 
       flux_dn(:) = flux_dn(:) + solar_beam(:)
 
@@ -280,12 +280,12 @@ contains
       integer(ik) :: k
 
       if (.not. allocated(level_planckian)) &
-         allocate (level_planckian(config%nlev + 1))
+         allocate (level_planckian(config%nlay + 1))
 
       surface_planckian = planck_function(g_point, surface_temperature)
       level_planckian(1) = planck_function(g_point, level_temperature(1))
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
 
          k_abs = longwave_absorption_coefficient( &
                  g_point, pressure(k), temperature(k))
@@ -357,7 +357,7 @@ contains
       albedo(1) = sfc_albedo
       emission_up(1) = sfc_upward_flux
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
          beta(k) = 1/(1 - reflectance(k)*albedo(k))
          albedo(k + 1) = reflectance(k) &
                          + transmittance(k)**2*beta(k)*albedo(k)
@@ -365,11 +365,11 @@ contains
                               emission_up(k) + source_dn(k)*albedo(k))
       end do
 
-      flux_dn(config%nlev + 1) = toa_downward_flux
-      flux_up(config%nlev + 1) = albedo(config%nlev + 1)*toa_downward_flux &
-                                 + emission_up(config%nlev + 1)
+      flux_dn(config%nlay + 1) = toa_downward_flux
+      flux_up(config%nlay + 1) = albedo(config%nlay + 1)*toa_downward_flux &
+                                 + emission_up(config%nlay + 1)
 
-      do k = config%nlev + 1, 2, -1
+      do k = config%nlay + 1, 2, -1
          flux_dn(k - 1) = beta(k - 1)*(source_dn(k - 1) &
                                        + transmittance(k - 1)*flux_dn(k) &
                                        + reflectance(k - 1)*emission_up(k - 1))
@@ -404,30 +404,30 @@ contains
    subroutine allocate_radiation_arrays()
 
       if (.not. allocated(upward_longwave_flux)) &
-         allocate (upward_longwave_flux(isd:ied, jsd:jed, config%nlev + 1))
+         allocate (upward_longwave_flux(isd:ied, jsd:jed, config%nlay + 1))
       if (.not. allocated(downward_longwave_flux)) &
-         allocate (downward_longwave_flux(isd:ied, jsd:jed, config%nlev + 1))
+         allocate (downward_longwave_flux(isd:ied, jsd:jed, config%nlay + 1))
       if (.not. allocated(upward_shortwave_flux)) &
-         allocate (upward_shortwave_flux(isd:ied, jsd:jed, config%nlev + 1))
+         allocate (upward_shortwave_flux(isd:ied, jsd:jed, config%nlay + 1))
       if (.not. allocated(downward_shortwave_flux)) &
-         allocate (downward_shortwave_flux(isd:ied, jsd:jed, config%nlev + 1))
+         allocate (downward_shortwave_flux(isd:ied, jsd:jed, config%nlay + 1))
 
       if (.not. allocated(layer_temperature)) &
-         allocate (layer_temperature(isd:ied, jsd:jed, config%nlev))
+         allocate (layer_temperature(isd:ied, jsd:jed, config%nlay))
       if (.not. allocated(level_temperature)) &
-         allocate (level_temperature(isd:ied, jsd:jed, config%nlev + 1))
+         allocate (level_temperature(isd:ied, jsd:jed, config%nlay + 1))
 
-      if (.not. allocated(dm)) allocate (dm(config%nlev))
-      if (.not. allocated(flux_up)) allocate (flux_up(config%nlev + 1))
-      if (.not. allocated(flux_dn)) allocate (flux_dn(config%nlev + 1))
-      if (.not. allocated(transmittance)) allocate (transmittance(config%nlev))
-      if (.not. allocated(reflectance)) allocate (reflectance(config%nlev))
-      if (.not. allocated(albedo)) allocate (albedo(config%nlev + 1))
-      if (.not. allocated(emission_up)) allocate (emission_up(config%nlev + 1))
-      if (.not. allocated(beta)) allocate (beta(config%nlev))
-      if (.not. allocated(source_up)) allocate (source_up(config%nlev + 1))
-      if (.not. allocated(source_dn)) allocate (source_dn(config%nlev + 1))
-      if (.not. allocated(solar_beam)) allocate (solar_beam(config%nlev + 1))
+      if (.not. allocated(dm)) allocate (dm(config%nlay))
+      if (.not. allocated(flux_up)) allocate (flux_up(config%nlay + 1))
+      if (.not. allocated(flux_dn)) allocate (flux_dn(config%nlay + 1))
+      if (.not. allocated(transmittance)) allocate (transmittance(config%nlay))
+      if (.not. allocated(reflectance)) allocate (reflectance(config%nlay))
+      if (.not. allocated(albedo)) allocate (albedo(config%nlay + 1))
+      if (.not. allocated(emission_up)) allocate (emission_up(config%nlay + 1))
+      if (.not. allocated(beta)) allocate (beta(config%nlay))
+      if (.not. allocated(source_up)) allocate (source_up(config%nlay + 1))
+      if (.not. allocated(source_dn)) allocate (source_dn(config%nlay + 1))
+      if (.not. allocated(solar_beam)) allocate (solar_beam(config%nlay + 1))
 
    end subroutine allocate_radiation_arrays
 

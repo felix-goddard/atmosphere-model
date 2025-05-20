@@ -39,22 +39,22 @@ contains
       ! Allocate output arrays
 
       if (.not. allocated(output_field)) &
-         allocate (output_field(isd:ied, jsd:jed, config%nlev, n_output_fields))
+         allocate (output_field(isd:ied, jsd:jed, config%nlay, n_output_fields))
 
       if (.not. allocated(compensation)) &
-         allocate (compensation(isd:ied, jsd:jed, config%nlev, n_output_fields))
+         allocate (compensation(isd:ied, jsd:jed, config%nlay, n_output_fields))
 
       output_field(:, :, :, :) = 0.
       compensation(:, :, :, :) = 0.
       accumulation_time = 0.
 
       if (.not. allocated(gather_coarray)) &
-         allocate (gather_coarray(config%nx, config%ny, config%nlev) [*])
+         allocate (gather_coarray(config%nx, config%ny, config%nlay) [*])
 
       if (this_image() == 1) then
 
          if (.not. allocated(gather)) &
-            allocate (gather(config%nx, config%ny, config%nlev))
+            allocate (gather(config%nx, config%ny, config%nlay))
 
          ! Create output netCDF
 
@@ -68,12 +68,12 @@ contains
          call output_nc%create_axis( &
             'y', [(-.5*config%Ly + (i + .5)*config%dy, i=0, config%ny - 1)])
 
-         call output_nc%create_axis('lev', [(i, i=1, config%nlev)])
+         call output_nc%create_axis('lay', [(i, i=1, config%nlay)])
 
-         call output_nc%create_variable('dp', ['t  ', 'x  ', 'y  ', 'lev'])
-         call output_nc%create_variable('pt', ['t  ', 'x  ', 'y  ', 'lev'])
-         call output_nc%create_variable('u', ['t  ', 'x  ', 'y  ', 'lev'])
-         call output_nc%create_variable('v', ['t  ', 'x  ', 'y  ', 'lev'])
+         call output_nc%create_variable('dp', ['t  ', 'x  ', 'y  ', 'lay'])
+         call output_nc%create_variable('pt', ['t  ', 'x  ', 'y  ', 'lay'])
+         call output_nc%create_variable('u', ['t  ', 'x  ', 'y  ', 'lay'])
+         call output_nc%create_variable('v', ['t  ', 'x  ', 'y  ', 'lay'])
          call output_nc%create_variable('ts', ['t  ', 'x  ', 'y  '])
 
       end if
@@ -95,7 +95,7 @@ contains
             ! surface temperature
             call compensated_sum(dt*ts(i, j), i, j, 1, TS_IDX)
 
-            do k = 1, config%nlev
+            do k = 1, config%nlay
                ! pressure thickness
                call compensated_sum(dt*dp(i, j, k), i, j, k, DP_IDX)
 
@@ -186,12 +186,12 @@ contains
             'yf', [(-.5*config%Ly + i*config%dy, i=0, config%ny - 1)])
 
          ! levels
-         call restart_nc%create_axis('lev', [(i, i=1, config%nlev)])
+         call restart_nc%create_axis('lay', [(i, i=1, config%nlay)])
 
-         call restart_nc%create_variable('dp', ['xc ', 'yc ', 'lev'])
-         call restart_nc%create_variable('pt', ['xc ', 'yc ', 'lev'])
-         call restart_nc%create_variable('u', ['xc ', 'yf ', 'lev'])
-         call restart_nc%create_variable('v', ['xf ', 'yc ', 'lev'])
+         call restart_nc%create_variable('dp', ['xc ', 'yc ', 'lay'])
+         call restart_nc%create_variable('pt', ['xc ', 'yc ', 'lay'])
+         call restart_nc%create_variable('u', ['xc ', 'yf ', 'lay'])
+         call restart_nc%create_variable('v', ['xf ', 'yc ', 'lay'])
          call restart_nc%create_variable('gzs', ['xc ', 'yc '])
          call restart_nc%create_variable('ts', ['xc ', 'yc '])
 
@@ -210,7 +210,7 @@ contains
 
    subroutine write_3d (netcdf, field, name)
       type(netcdf_file), intent(inout) :: netcdf
-      real(rk), intent(in) :: field(isd:ied, jsd:jed, config%nlev)
+      real(rk), intent(in) :: field(isd:ied, jsd:jed, config%nlay)
       character(len=*), intent(in) :: name
 
       sync all

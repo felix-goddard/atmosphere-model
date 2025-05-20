@@ -1,5 +1,6 @@
 module mod_fields
 
+   use ieee_arithmetic, only: ieee_is_finite
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
@@ -12,7 +13,7 @@ module mod_fields
    implicit none
    private
 
-   public :: init_prognostic_fields, initial_halo_exchange
+   public :: init_prognostic_fields, initial_halo_exchange, check_stability
 
    ! prognostic fields
    real(rk), public, allocatable :: dp(:, :, :) ! prognostic pressure thickness
@@ -35,25 +36,25 @@ module mod_fields
 contains
 
    subroutine allocate_fields()
-      integer(ik) :: nlev
+      integer(ik) :: nlay
 
-      nlev = config%nlev
+      nlay = config%nlay
 
       ! prognostic fields
-      if (.not. allocated(dp)) allocate (dp(is:ie, js:je, nlev))
-      if (.not. allocated(pt)) allocate (pt(is:ie, js:je, nlev))
-      if (.not. allocated(ud)) allocate (ud(is:ie, js:je, nlev))
-      if (.not. allocated(vd)) allocate (vd(is:ie, js:je, nlev))
+      if (.not. allocated(dp)) allocate (dp(is:ie, js:je, nlay))
+      if (.not. allocated(pt)) allocate (pt(is:ie, js:je, nlay))
+      if (.not. allocated(ud)) allocate (ud(is:ie, js:je, nlay))
+      if (.not. allocated(vd)) allocate (vd(is:ie, js:je, nlay))
       if (.not. allocated(ts)) allocate (ts(is:ie, js:je))
 
       ! diagnostic and auxiliary fields
-      if (.not. allocated(play)) allocate (play(is:ie, js:je, nlev))
-      if (.not. allocated(playkap)) allocate (playkap(is:ie, js:je, nlev))
-      if (.not. allocated(plev)) allocate (plev(is:ie, js:je, nlev + 1))
-      if (.not. allocated(pkap)) allocate (pkap(is:ie, js:je, nlev + 1))
-      if (.not. allocated(gz)) allocate (gz(is:ie, js:je, nlev + 1))
+      if (.not. allocated(play)) allocate (play(is:ie, js:je, nlay))
+      if (.not. allocated(playkap)) allocate (playkap(is:ie, js:je, nlay))
+      if (.not. allocated(plev)) allocate (plev(is:ie, js:je, nlay + 1))
+      if (.not. allocated(pkap)) allocate (pkap(is:ie, js:je, nlay + 1))
+      if (.not. allocated(gz)) allocate (gz(is:ie, js:je, nlay + 1))
 
-      if (.not. allocated(net_flux)) allocate (net_flux(is:ie, js:je, nlev + 1))
+      if (.not. allocated(net_flux)) allocate (net_flux(is:ie, js:je, nlay + 1))
 
       if (.not. allocated(radius)) allocate (radius(is:ie, js:je))
 
@@ -67,7 +68,7 @@ contains
 
       call allocate_fields()
 
-      allocate (values(1:config%nx, 1:config%ny, 1:config%nlev))
+      allocate (values(1:config%nx, 1:config%ny, 1:config%nlay))
 
       ! Load 3D fields
       names = ['dp', 'pt', 'u ', 'v ']
@@ -83,7 +84,7 @@ contains
          end if
 
          call initial_nc%read_variable( &
-            names(i), values(1:config%nx, 1:config%ny, 1:config%nlev))
+            names(i), values(1:config%nx, 1:config%ny, 1:config%nlay))
 
          select case (trim(names(i)))
          case ('dp')
@@ -123,8 +124,8 @@ contains
 
       deallocate (values)
 
-      plev(is:ie, js:je, config%nlev + 1) = top_pressure
-      pkap(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
+      plev(is:ie, js:je, config%nlay + 1) = top_pressure
+      pkap(is:ie, js:je, config%nlay + 1) = top_pressure**kappa
 
       call initial_nc%read_axis('xc', coord_points)
       do j = js, je
@@ -145,5 +146,44 @@ contains
       call halo_exchange(dp, pt, gz, ud, vd)
 
    end subroutine initial_halo_exchange
+
+   function check_stability() result(is_stable)
+      logical :: is_stable
+
+      is_stable = .true.
+
+      if (.not. all(ieee_is_finite(dp(isd:ied, jsd:jed, :)))) then
+         is_stable = .false.
+         write (log_str, '(2(a,f8.4))') &
+            'Instability detected in pressure thickness; minval = ', &
+            minval(dp), '; maxval = ', maxval(dp)
+         call logger%fatal('run_model', log_str)
+      end if
+
+      if (.not. all(ieee_is_finite(pt(isd:ied, jsd:jed, :)))) then
+         is_stable = .false.
+         write (log_str, '(2(a,f8.4))') &
+            'Instability detected in potential temperature; minval = ', &
+            minval(pt), '; maxval = ', maxval(pt)
+         call logger%fatal('run_model', log_str)
+      end if
+
+      if (.not. all(ieee_is_finite(ud(isd:ied, jsd:jed, :)))) then
+         is_stable = .false.
+         write (log_str, '(2(a,f8.4))') &
+            'Instability detected in u wind; minval = ', &
+            minval(ud), '; maxval = ', maxval(ud)
+         call logger%fatal('run_model', log_str)
+      end if
+
+      if (.not. all(ieee_is_finite(vd(isd:ied, jsd:jed, :)))) then
+         is_stable = .false.
+         write (log_str, '(2(a,f8.4))') &
+            'Instability detected in v wind; minval = ', &
+            minval(vd), '; maxval = ', maxval(vd)
+         call logger%fatal('run_model', log_str)
+      end if
+
+   end function check_stability
 
 end module mod_fields

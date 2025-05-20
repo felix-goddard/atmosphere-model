@@ -23,7 +23,7 @@ module mod_sync
    ! The edge_buffer has 5 dimensions:
    ! - along-boundary direction (is/js to ie/je)
    ! - across-boundary direction (1:halo_width)
-   ! - vertical direction (1:nlev+1)
+   ! - vertical direction (1:nlay+1)
    ! - neighbour tile (1:4)
    ! - variable (1:max_n_args) so we can multiple variables at once
    ! While we could do each neighbouring tile or each prognostic individually,
@@ -32,7 +32,7 @@ module mod_sync
    ! Similarly, the corner_buffer has:
    ! - along-boundary direction (1:halo_width)
    ! - across-boundary direction (1:halo_width)
-   ! - vertical direction (1:nlev+1)
+   ! - vertical direction (1:nlay+1)
    ! - neighbour tile (1:4)
    ! - variable (1:max_n_args)
 
@@ -52,57 +52,57 @@ contains
    end subroutine halo_exchange_1arg_2d
 
    subroutine halo_exchange_1arg_levels(a)
-      real(rk), dimension(is:ie, js:je, 1:config%nlev + 1), intent(inout) :: a
+      real(rk), dimension(is:ie, js:je, 1:config%nlay + 1), intent(inout) :: a
 
       sync images(set(neighbours))
 
-      call copy_to_buffer_3d(a, 1, config%nlev + 1)
+      call copy_to_buffer_3d(a, 1, config%nlay + 1)
 
       sync images(set(neighbours))
 
-      call copy_from_buffer_3d(a, 1, config%nlev + 1)
+      call copy_from_buffer_3d(a, 1, config%nlay + 1)
 
    end subroutine halo_exchange_1arg_levels
 
    subroutine halo_exchange_4arg_layers(a, b, c, d)
-      real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: &
+      real(rk), dimension(is:ie, js:je, 1:config%nlay), intent(inout) :: &
          a, b, c, d
 
       sync images(set(neighbours))
 
-      call copy_to_buffer_3d(a, 1, config%nlev)
-      call copy_to_buffer_3d(b, 2, config%nlev)
-      call copy_to_buffer_3d(c, 3, config%nlev)
-      call copy_to_buffer_3d(d, 4, config%nlev)
+      call copy_to_buffer_3d(a, 1, config%nlay)
+      call copy_to_buffer_3d(b, 2, config%nlay)
+      call copy_to_buffer_3d(c, 3, config%nlay)
+      call copy_to_buffer_3d(d, 4, config%nlay)
 
       sync images(set(neighbours))
 
-      call copy_from_buffer_3d(a, 1, config%nlev)
-      call copy_from_buffer_3d(b, 2, config%nlev)
-      call copy_from_buffer_3d(c, 3, config%nlev)
-      call copy_from_buffer_3d(d, 4, config%nlev)
+      call copy_from_buffer_3d(a, 1, config%nlay)
+      call copy_from_buffer_3d(b, 2, config%nlay)
+      call copy_from_buffer_3d(c, 3, config%nlay)
+      call copy_from_buffer_3d(d, 4, config%nlay)
 
    end subroutine halo_exchange_4arg_layers
 
    subroutine halo_exchange_5arg_layers(a, b, c, d, e)
-      real(rk), dimension(is:ie, js:je, 1:config%nlev), intent(inout) :: &
+      real(rk), dimension(is:ie, js:je, 1:config%nlay), intent(inout) :: &
          a, b, c, d, e
 
       sync images(set(neighbours))
 
-      call copy_to_buffer_3d(a, 1, config%nlev)
-      call copy_to_buffer_3d(b, 2, config%nlev)
-      call copy_to_buffer_3d(c, 3, config%nlev)
-      call copy_to_buffer_3d(d, 4, config%nlev)
-      call copy_to_buffer_3d(e, 5, config%nlev)
+      call copy_to_buffer_3d(a, 1, config%nlay)
+      call copy_to_buffer_3d(b, 2, config%nlay)
+      call copy_to_buffer_3d(c, 3, config%nlay)
+      call copy_to_buffer_3d(d, 4, config%nlay)
+      call copy_to_buffer_3d(e, 5, config%nlay)
 
       sync images(set(neighbours))
 
-      call copy_from_buffer_3d(a, 1, config%nlev)
-      call copy_from_buffer_3d(b, 2, config%nlev)
-      call copy_from_buffer_3d(c, 3, config%nlev)
-      call copy_from_buffer_3d(d, 4, config%nlev)
-      call copy_from_buffer_3d(e, 5, config%nlev)
+      call copy_from_buffer_3d(a, 1, config%nlay)
+      call copy_from_buffer_3d(b, 2, config%nlay)
+      call copy_from_buffer_3d(c, 3, config%nlay)
+      call copy_from_buffer_3d(d, 4, config%nlay)
+      call copy_from_buffer_3d(e, 5, config%nlay)
 
    end subroutine halo_exchange_5arg_layers
 
@@ -221,11 +221,11 @@ contains
       if (.not. allocated(edge_buffer)) &
          allocate (edge_buffer( &
                    1:max(config%nx, config%ny), &
-                   halo_width, config%nlev + 1, 4, max_n_args) [*])
+                   halo_width, config%nlay + 1, 4, max_n_args) [*])
 
       if (.not. allocated(corner_buffer)) &
          allocate (corner_buffer( &
-                   halo_width, halo_width, config%nlev + 1, 4, max_n_args) [*])
+                   halo_width, halo_width, config%nlay + 1, 4, max_n_args) [*])
 
    end subroutine allocate_sync_buffers
 

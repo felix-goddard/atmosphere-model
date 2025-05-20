@@ -7,8 +7,9 @@ module mod_model
    use mod_netcdf, only: netcdf_file
    use mod_input, only: read_initial_file
    use mod_tiles, only: init_tiles
-   use mod_fields, only: init_prognostic_fields, initial_halo_exchange
-   use mod_sw_dyn, only: allocate_sw_dyn_arrays, is_stable, &
+   use mod_fields, only: init_prognostic_fields, initial_halo_exchange, &
+                         check_stability
+   use mod_sw_dyn, only: allocate_sw_dyn_arrays, &
                          cgrid_dynamics_step, cgrid_halo_exchange, &
                          dgrid_dynamics_step, dgrid_halo_exchange
    use mod_radiation, only: allocate_radiation_arrays, &
@@ -158,16 +159,9 @@ contains
          call physics_halo_exchange()
          call timing_off('HALO EXCHANGE')
 
-         stable = is_stable()
-
+         stable = check_stability()
          call co_reduce(stable, and_func)
-         if (.not. stable) then
-            if (this_image() == 1) then
-               write (log_str, '(a)') 'Instability detecting, aborting.'
-               call logger%fatal('run_model', log_str)
-            end if
-            exit main_loop
-         end if
+         if (.not. stable) exit main_loop
 
          time = time + dt
 

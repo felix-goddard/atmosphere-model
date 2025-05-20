@@ -34,7 +34,7 @@ contains
 
       ! Check we have all the expected coordinates
 
-      names = ['xc ', 'yc ', 'xf ', 'yf ', 'lev']
+      names = ['xc ', 'yc ', 'xf ', 'yf ', 'lay']
       do i = 1, size(names)
 
          idx = initial_nc%get_axis_index(names(i))
@@ -68,7 +68,7 @@ contains
                call abort_now()
             end if
 
-         else if (names(i) == 'lev') then
+         else if (names(i) == 'lay') then
 
             if (zsize == -1) then
                zsize = initial_nc%axes(idx)%size
@@ -87,7 +87,7 @@ contains
 
       config%nx = xsize
       config%ny = ysize
-      config%nlev = zsize
+      config%nlay = zsize
 
       call initial_nc%read_axis('xc', points)
       dx = points(2) - points(1)

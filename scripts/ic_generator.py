@@ -12,7 +12,7 @@ ny = 200
 Lx = 15000e3
 Ly = 15000e3
 
-nlev = 2
+nlay = 20
 
 dx = Lx / nx
 dy = Ly / ny
@@ -26,10 +26,10 @@ face_ys = mass_ys - dy/2
 #=======================================================
 # Initialise data arrays
 
-dp = np.zeros((ny,nx,nlev)) # pressure thickness
-pt = np.zeros((ny,nx,nlev)) # potential temperature
-u = np.zeros((ny,nx,nlev)) # eastward wind
-v = np.zeros((ny,nx,nlev)) # northward wind
+dp = np.zeros((ny,nx,nlay)) # pressure thickness
+pt = np.zeros((ny,nx,nlay)) # potential temperature
+u = np.zeros((ny,nx,nlay)) # eastward wind
+v = np.zeros((ny,nx,nlay)) # northward wind
 gzs = np.zeros((ny,nx)) # surface geopotential height
 
 #=======================================================
@@ -37,6 +37,9 @@ gzs = np.zeros((ny,nx)) # surface geopotential height
 
 # We initialise the atmosphere to be in hydrostatic balance over some
 # specified terrain with a constant surface temperature and lapse rate
+
+dry_gas_constant = 287.052874 # specific gas constant of dry air, J/kg/K
+dry_heat_capacity = 1005 # constant pressure heat capacity of dry air, J/kg/K
 
 f = config['physics_parameters']['coriolis_parameter']
 g = config['physics_parameters']['gravity']
@@ -54,28 +57,28 @@ surface_height = (
     1e3 * np.exp(-(mass_xs**2 + mass_ys**2) / (Lx/8)**2)
     * (1 + np.cos(2*np.pi * np.sqrt(mass_xs**2 + mass_ys**2) / (Lx/10))))
 
-pressure = np.zeros((ny,nx,nlev+1))
-pressure_kappa = np.zeros((ny,nx,nlev+1))
+pressure = np.zeros((ny,nx,nlay+1))
+pressure_kappa = np.zeros((ny,nx,nlay+1))
 
 pressure[:,:,0] = top_pressure * (
     (surface_temperature - lapse_rate * surface_height)
     / (surface_temperature - lapse_rate * top_height)
 )**(g/lapse_rate/dry_gas_constant)
 
-# we split the pressure difference between top and bottom into `nlev` equal layers
-dp[:,:,:] = repeat_along_z((pressure[:,:,0] - top_pressure) / nlev, nlev)
+# we split the pressure difference between top and bottom into `nlay` equal layers
+dp[:,:,:] = repeat_along_z((pressure[:,:,0] - top_pressure) / nlay, nlay)
 
 # calculate the pressure on the layer interfaces
 pressure[:,:,-1] = top_pressure
 pressure[:,:,:-1] = top_pressure + np.cumsum(dp[:,:,::-1], axis=2)[:,:,::-1]
 
 # calculate the geopotential on interfaces for our constant lapse rate atmosphere
-geopotential = np.zeros((ny,nx,nlev+1))
+geopotential = np.zeros((ny,nx,nlay+1))
 geopotential[:,:,0] = g * surface_height[:,:]
 geopotential[:,:,1:] = (g/lapse_rate) * (
-    repeat_along_z(surface_temperature, nlev)
-    - repeat_along_z(surface_temperature - lapse_rate * surface_height, nlev)
-    * (pressure[:,:,1:] / repeat_along_z(pressure[:,:,0], nlev))
+    repeat_along_z(surface_temperature, nlay)
+    - repeat_along_z(surface_temperature - lapse_rate * surface_height, nlay)
+    * (pressure[:,:,1:] / repeat_along_z(pressure[:,:,0], nlay))
     ** (lapse_rate*dry_gas_constant/g)
 )
 
@@ -94,10 +97,10 @@ v[:,:,:] = 0
 
 xr.Dataset(
     data_vars=dict(
-        dp=(['yc', 'xc', 'lev', 't'], dp[..., np.newaxis]),
-        pt=(['yc', 'xc', 'lev', 't'], pt[..., np.newaxis]),
-        u=(['yc', 'xf', 'lev', 't'], u[..., np.newaxis]),
-        v=(['yf', 'xc', 'lev', 't'], v[..., np.newaxis]),
+        dp=(['yc', 'xc', 'lay', 't'], dp[..., np.newaxis]),
+        pt=(['yc', 'xc', 'lay', 't'], pt[..., np.newaxis]),
+        u=(['yc', 'xf', 'lay', 't'], u[..., np.newaxis]),
+        v=(['yf', 'xc', 'lay', 't'], v[..., np.newaxis]),
         gzs=(['yc', 'xc', 't'], geopotential[:,:,0, np.newaxis]),
         ts=(['yc', 'xc', 't'], (surface_temperature[:,:])[..., np.newaxis]),
     ),
@@ -107,6 +110,6 @@ xr.Dataset(
         yc=('yc', mass_ys[:,0]),
         xf=('xf', face_xs[0,:]),
         yf=('yf', face_ys[:,0]),
-        lev=('lev', list(range(1,nlev+1)))
+        lay=('lay', list(range(1,nlay+1)))
     ),
 ).to_netcdf('initial.nc', unlimited_dims=['t'])

@@ -20,7 +20,7 @@ module mod_config
                   t_initial, t_final
 
       ! domain parameters
-      integer(ik) :: nx, ny, nlev
+      integer(ik) :: nx, ny, nlay
       real(rk) :: Lx, Ly, dx, dy
    end type Config
 

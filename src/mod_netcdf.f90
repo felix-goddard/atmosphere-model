@@ -581,7 +581,7 @@ contains
                dim_map(i) = 1
             else if (any(self%vars(idx)%dims(i) == ['y ', 'yc', 'yf'])) then
                dim_map(i) = config%nx
-            else if (self%vars(idx)%dims(i) == 'lev') then
+            else if (self%vars(idx)%dims(i) == 'lay') then
                dim_map(i) = config%nx*config%ny
             end if
          end if

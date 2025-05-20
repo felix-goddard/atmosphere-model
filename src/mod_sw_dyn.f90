@@ -1,6 +1,5 @@
 module mod_sw_dyn
 
-   use ieee_arithmetic, only: ieee_is_finite
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
@@ -14,7 +13,7 @@ module mod_sw_dyn
    implicit none
    private
 
-   public :: allocate_sw_dyn_arrays, is_stable, &
+   public :: allocate_sw_dyn_arrays, &
              cgrid_dynamics_step, cgrid_halo_exchange, &
              dgrid_dynamics_step, dgrid_halo_exchange
 
@@ -71,16 +70,6 @@ module mod_sw_dyn
 
 contains
 
-   function is_stable()
-      logical :: is_stable
-
-      is_stable = (all(ieee_is_finite(dp(isd:ied, jsd:jed, :))) &
-                   .and. all(ieee_is_finite(pt(isd:ied, jsd:jed, :))) &
-                   .and. all(ieee_is_finite(ud(isd:ied, jsd:jed, :))) &
-                   .and. all(ieee_is_finite(vd(isd:ied, jsd:jed, :))))
-
-   end function is_stable
-
    subroutine cgrid_dynamics_step(dt)
       real(rk), intent(in) :: dt
       integer(ik) :: i, j, k
@@ -91,7 +80,7 @@ contains
       rA = 1./(config%dx*config%dy)
 
       ! calculate pressure on the layer interfaces
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
          plev(is:ie, js:je, k) = &
             plev(is:ie, js:je, k + 1) &
             + dp(is:ie, js:je, k)
@@ -100,7 +89,7 @@ contains
             plev(is:ie, js:je, k)**kappa
       end do
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
 
          ! Calculate the rate of change of potential temperature for this layer.
          ! We only need this over is+4:ie-4 (and same for j) because that's the
@@ -262,7 +251,7 @@ contains
       ! Pressure and geopotential
 
       ! calculate pressure on the layer interfaces
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
          plev(is + 5:ie - 5, js + 5:je - 5, k) = &
             plev(is + 5:ie - 5, js + 5:je - 5, k + 1) &
             + dpc(is + 5:ie - 5, js + 5:je - 5, k)
@@ -272,7 +261,7 @@ contains
       end do
 
       ! calculate the geopotential height of the interfaces
-      do k = 1, config%nlev
+      do k = 1, config%nlay
          gz(is + 5:ie - 5, js + 5:je - 5, k + 1) = &
             gz(is + 5:ie - 5, js + 5:je - 5, k) &
             + dry_heat_capacity*ptc(is + 5:ie - 5, js + 5:je - 5, k)*( &
@@ -280,7 +269,7 @@ contains
             - pkap(is + 5:ie - 5, js + 5:je - 5, k + 1))
       end do
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
 
          ! ===========================================================================
          ! Kinetic energy, vorticity, and pressure gradient force
@@ -414,7 +403,7 @@ contains
       dtdy = dt/config%dy
       rA = 1./(config%dx*config%dy)
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
 
          do concurrent(i=is + 1:ie, j=js + 1:je)
             ub(i, j) = .5*(uc(i, j, k) + uc(i, j - 1, k))
@@ -557,7 +546,7 @@ contains
       ! Pressure and geopotential
 
       ! calculate pressure on the layer interfaces
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
          plev(is + 4:ie - 4, js + 4:je - 4, k) = &
             plev(is + 4:ie - 4, js + 4:je - 4, k + 1) &
             + dp(is + 4:ie - 4, js + 4:je - 4, k)
@@ -572,7 +561,7 @@ contains
       end do
 
       ! calculate the geopotential height of the interfaces
-      do k = 1, config%nlev
+      do k = 1, config%nlay
          gz(is + 4:ie - 4, js + 4:je - 4, k + 1) = &
             gz(is + 4:ie - 4, js + 4:je - 4, k) &
             + dry_heat_capacity*pt(is + 4:ie - 4, js + 4:je - 4, k)*( &
@@ -585,7 +574,7 @@ contains
             is + 4, ie - 4, js + 4, je - 4)
       end do
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
 
          ! ===========================================================================
          ! Kinetic energy, vorticity, and pressure gradient force
@@ -881,27 +870,27 @@ contains
 
    subroutine allocate_sw_dyn_arrays()
 
-      if (.not. allocated(dpc)) allocate (dpc(is:ie, js:je, 1:config%nlev))
-      if (.not. allocated(ptc)) allocate (ptc(is:ie, js:je, 1:config%nlev))
-      if (.not. allocated(uc)) allocate (uc(is:ie, js:je, 1:config%nlev))
-      if (.not. allocated(vc)) allocate (vc(is:ie, js:je, 1:config%nlev))
+      if (.not. allocated(dpc)) allocate (dpc(is:ie, js:je, 1:config%nlay))
+      if (.not. allocated(ptc)) allocate (ptc(is:ie, js:je, 1:config%nlay))
+      if (.not. allocated(uc)) allocate (uc(is:ie, js:je, 1:config%nlay))
+      if (.not. allocated(vc)) allocate (vc(is:ie, js:je, 1:config%nlay))
 
       if (.not. allocated(vorticity)) allocate (vorticity(is:ie, js:je))
       if (.not. allocated(kinetic_energy)) &
          allocate (kinetic_energy(is:ie, js:je))
 
       if (.not. allocated(heating_rate)) &
-         allocate (heating_rate(is:ie, js:je, 1:config%nlev))
+         allocate (heating_rate(is:ie, js:je, 1:config%nlay))
 
       if (.not. allocated(pgfx)) allocate (pgfx(is:ie, js:je))
       if (.not. allocated(pgfy)) allocate (pgfy(is:ie, js:je))
       if (.not. allocated(pkapb)) &
-         allocate (pkapb(is:ie, js:je, 1:config%nlev + 1))
+         allocate (pkapb(is:ie, js:je, 1:config%nlay + 1))
       if (.not. allocated(gzb)) &
-         allocate (gzb(is:ie, js:je, 1:config%nlev + 1))
+         allocate (gzb(is:ie, js:je, 1:config%nlay + 1))
 
       ! the top pressure is constant so no need to interpolate
-      pkapb(is:ie, js:je, config%nlev + 1) = top_pressure**kappa
+      pkapb(is:ie, js:je, config%nlay + 1) = top_pressure**kappa
 
       ! the surface geopotential is constant so we can interpolate it once
       ! at the start and be done

@@ -45,7 +45,7 @@ contains
                                 + vd(i, j + 1, :) + vd(i + 1, j + 1, :)))
       end do
 
-      do k = config%nlev, 1, -1
+      do k = config%nlay, 1, -1
          plev(is + 1:ie - 1, js + 1:je - 1, k) = &
             plev(is + 1:ie - 1, js + 1:je - 1, k + 1) &
             + dp(is + 1:ie - 1, js + 1:je - 1, k)
@@ -54,7 +54,7 @@ contains
             plev(is + 1:ie - 1, js + 1:je - 1, k)**kappa
       end do
 
-      do k = 1, config%nlev
+      do k = 1, config%nlay
          gz(is + 1:ie - 1, js + 1:je - 1, k + 1) = &
             gz(is + 1:ie - 1, js + 1:je - 1, k) &
             + dry_heat_capacity*pt(is + 1:ie - 1, js + 1:je - 1, k)*( &
@@ -77,8 +77,8 @@ contains
    subroutine dry_convective_adjustment()
       integer(ik) :: i, j, k
       real(rk) :: ri, exchange, mixing_fraction, &
-                  energy(config%nlev), u_adj(config%nlev), v_adj(config%nlev), &
-                  gz_adj(config%nlev + 1), pt_adj(config%nlev)
+                  energy(config%nlay), u_adj(config%nlay), v_adj(config%nlay), &
+                  gz_adj(config%nlay + 1), pt_adj(config%nlay)
       real(rk), parameter :: min_v2 = 1e-4
       real(rk), parameter :: critical_richardson_number = .25
       real(rk), parameter :: mixing_timescale = 600 ! 10 minutes
@@ -89,12 +89,12 @@ contains
          ! we conserve energy
 
          energy(:) = dry_heat_capacity*pt(i, j, :)*playkap(i, j, :) &
-                     + .5*(gz(i, j, 2:) + gz(i, j, :config%nlev) &
+                     + .5*(gz(i, j, 2:) + gz(i, j, :config%nlay) &
                            + ua(i, j, :)**2 + va(i, j, :)**2)
          u_adj(:) = ua(i, j, :)
          v_adj(:) = va(i, j, :)
 
-         do k = 1, config%nlev - 1
+         do k = 1, config%nlay - 1
 
             ! local richardson number on the interface between layers k and k+1
             ri = (pt(i, j, k + 1) - pt(i, j, k)) &
@@ -134,7 +134,7 @@ contains
          ! reconstruct the potential temperature from the new energy
 
          gz_adj(1) = gz(i, j, 1)
-         do k = 1, config%nlev
+         do k = 1, config%nlay
 
             pt_adj(k) = (energy(k) - gz_adj(k) &
                          - .5*(u_adj(k)**2 + v_adj(k)**2)) &
@@ -179,17 +179,17 @@ contains
    subroutine allocate_physics_arrays()
 
       if (.not. allocated(dp_tend)) &
-         allocate (dp_tend(isd:ied, jsd:jed, config%nlev))
+         allocate (dp_tend(isd:ied, jsd:jed, config%nlay))
       if (.not. allocated(pt_tend)) &
-         allocate (pt_tend(isd:ied, jsd:jed, config%nlev))
+         allocate (pt_tend(isd:ied, jsd:jed, config%nlay))
       if (.not. allocated(u_tend)) &
-         allocate (u_tend(isd:ied, jsd:jed, config%nlev))
+         allocate (u_tend(isd:ied, jsd:jed, config%nlay))
       if (.not. allocated(v_tend)) &
-         allocate (v_tend(isd:ied, jsd:jed, config%nlev))
+         allocate (v_tend(isd:ied, jsd:jed, config%nlay))
       if (.not. allocated(ts_tend)) allocate (ts_tend(isd:ied, jsd:jed))
 
-      if (.not. allocated(ua)) allocate (ua(is:ie, js:je, config%nlev))
-      if (.not. allocated(va)) allocate (va(is:ie, js:je, config%nlev))
+      if (.not. allocated(ua)) allocate (ua(is:ie, js:je, config%nlay))
+      if (.not. allocated(va)) allocate (va(is:ie, js:je, config%nlay))
 
    end subroutine allocate_physics_arrays
 
