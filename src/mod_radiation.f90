@@ -4,7 +4,7 @@ module mod_radiation
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
    use mod_constants, only: pi, kappa, gravity, dry_heat_capacity
-   use mod_tiles, only: isd, ied, jsd, jed
+   use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
    use mod_fields, only: dp, pt, ts, play, playkap, plev, pkap, net_flux
    use mod_gas_optics, only: n_g_points, &
@@ -19,6 +19,8 @@ module mod_radiation
 
    public :: allocate_radiation_arrays, calculate_radiative_heating, &
              radiation_halo_exchange
+
+   integer(ik) :: isl, iel, jsl, jel
 
    real(rk), allocatable :: upward_longwave_flux(:, :, :)
    real(rk), allocatable :: downward_longwave_flux(:, :, :)
@@ -41,7 +43,7 @@ contains
       integer(ik) :: i, j, k, g
       real(rk), allocatable :: p1(:, :), p2(:, :)
       real(rk) :: irradiance, solar_zenith_angle, &
-                  surface_albedo, surface_emissivity, plog(isd:ied, jsd:jed)
+                  surface_albedo, surface_emissivity, plog(isl:iel, jsl:jel)
 
       ! ========================================================================
       ! Calculate layer properties of the entire atmosphere
@@ -49,54 +51,54 @@ contains
       ! level_temperature
 
       do k = config%nlay, 1, -1
-         plev(isd:ied, jsd:jed, k) = &
-            plev(isd:ied, jsd:jed, k + 1) + dp(isd:ied, jsd:jed, k)
+         plev(isl:iel, jsl:jel, k) = &
+            plev(isl:iel, jsl:jel, k + 1) + dp(isl:iel, jsl:jel, k)
 
-         pkap(isd:ied, jsd:jed, k) = plev(isd:ied, jsd:jed, k)**kappa
+         pkap(isl:iel, jsl:jel, k) = plev(isl:iel, jsl:jel, k)**kappa
 
-         plog(isd:ied, jsd:jed) = &
-            log(plev(isd:ied, jsd:jed, k)/plev(isd:ied, jsd:jed, k + 1))
+         plog(isl:iel, jsl:jel) = &
+            log(plev(isl:iel, jsl:jel, k)/plev(isl:iel, jsl:jel, k + 1))
 
-         play(isd:ied, jsd:jed, k) = dp(isd:ied, jsd:jed, k)/plog
+         play(isl:iel, jsl:jel, k) = dp(isl:iel, jsl:jel, k)/plog
 
-         playkap(isd:ied, jsd:jed, k) = &
-            (pkap(isd:ied, jsd:jed, k + 1) - pkap(isd:ied, jsd:jed, k)) &
+         playkap(isl:iel, jsl:jel, k) = &
+            (pkap(isl:iel, jsl:jel, k + 1) - pkap(isl:iel, jsl:jel, k)) &
             /(-plog*kappa)
 
-         layer_temperature(isd:ied, jsd:jed, k) = &
-            pt(isd:ied, jsd:jed, k)*playkap(isd:ied, jsd:jed, k)
+         layer_temperature(isl:iel, jsl:jel, k) = &
+            pt(isl:iel, jsl:jel, k)*playkap(isl:iel, jsl:jel, k)
 
          ! linear interpolation of T in log p
          if (k < config%nlay) then
-            p1 = log(play(isd:ied, jsd:jed, k))
-            p2 = log(play(isd:ied, jsd:jed, k + 1))
-            plog = log(plev(isd:ied, jsd:jed, k + 1))
+            p1 = log(play(isl:iel, jsl:jel, k))
+            p2 = log(play(isl:iel, jsl:jel, k + 1))
+            plog = log(plev(isl:iel, jsl:jel, k + 1))
 
-            level_temperature(isd:ied, jsd:jed, k + 1) = &
-               (layer_temperature(isd:ied, jsd:jed, k)*(p2 - plog) &
-                + layer_temperature(isd:ied, jsd:jed, k + 1) &
+            level_temperature(isl:iel, jsl:jel, k + 1) = &
+               (layer_temperature(isl:iel, jsl:jel, k)*(p2 - plog) &
+                + layer_temperature(isl:iel, jsl:jel, k + 1) &
                 *(plog - p1))/(p2 - p1)
          end if
       end do
 
       ! linear extrapolation of T in log p for the model top
-      p1 = log(play(isd:ied, jsd:jed, config%nlay - 1))
-      p2 = log(play(isd:ied, jsd:jed, config%nlay))
-      plog = log(plev(isd:ied, jsd:jed, config%nlay + 1))
+      p1 = log(play(isl:iel, jsl:jel, config%nlay - 1))
+      p2 = log(play(isl:iel, jsl:jel, config%nlay))
+      plog = log(plev(isl:iel, jsl:jel, config%nlay + 1))
 
-      level_temperature(isd:ied, jsd:jed, config%nlay + 1) = &
-         (layer_temperature(isd:ied, jsd:jed, config%nlay - 1)*(p2 - plog) &
-          + layer_temperature(isd:ied, jsd:jed, config%nlay) &
+      level_temperature(isl:iel, jsl:jel, config%nlay + 1) = &
+         (layer_temperature(isl:iel, jsl:jel, config%nlay - 1)*(p2 - plog) &
+          + layer_temperature(isl:iel, jsl:jel, config%nlay) &
           *(plog - p1))/(p2 - p1)
 
       ! linear extrapolation of T in log p for the model bottom
-      p1 = log(play(isd:ied, jsd:jed, 1))
-      p2 = log(play(isd:ied, jsd:jed, 2))
-      plog = log(plev(isd:ied, jsd:jed, 1))
+      p1 = log(play(isl:iel, jsl:jel, 1))
+      p2 = log(play(isl:iel, jsl:jel, 2))
+      plog = log(plev(isl:iel, jsl:jel, 1))
 
-      level_temperature(isd:ied, jsd:jed, 1) = &
-         (layer_temperature(isd:ied, jsd:jed, 1)*(p2 - plog) &
-          + layer_temperature(isd:ied, jsd:jed, 2)*(plog - p1))/(p2 - p1)
+      level_temperature(isl:iel, jsl:jel, 1) = &
+         (layer_temperature(isl:iel, jsl:jel, 1)*(p2 - plog) &
+          + layer_temperature(isl:iel, jsl:jel, 2)*(plog - p1))/(p2 - p1)
 
       ! ========================================================================
       ! Now solve the two-stream equations; this is done one column at a time
@@ -111,8 +113,8 @@ contains
       upward_longwave_flux(:, :, :) = 0.
       downward_longwave_flux(:, :, :) = 0.
 
-      do i = isd, ied
-         do j = jsd, jed
+      do i = isl, iel
+         do j = jsl, jel
 
             dm(:) = dp(i, j, :)/gravity
 
@@ -402,32 +404,44 @@ contains
    end subroutine radiation_halo_exchange
 
    subroutine allocate_radiation_arrays()
+      integer(ik) :: nlay
+
+      nlay = config%nlay
+
+      ! We want to restrict the size of the domain we operate on as much as
+      ! possible since the radiation calculations are slow; this is the smallest
+      ! domain we have to work on, defined by the domain needed for the
+      ! potential temperature heating rate in the D grid shallow water update
+      isl = is + 4
+      iel = ie - 4
+      jsl = js + 4
+      jel = je - 4
 
       if (.not. allocated(upward_longwave_flux)) &
-         allocate (upward_longwave_flux(isd:ied, jsd:jed, config%nlay + 1))
+         allocate (upward_longwave_flux(isl:iel, jsl:jel, nlay + 1))
       if (.not. allocated(downward_longwave_flux)) &
-         allocate (downward_longwave_flux(isd:ied, jsd:jed, config%nlay + 1))
+         allocate (downward_longwave_flux(isl:iel, jsl:jel, nlay + 1))
       if (.not. allocated(upward_shortwave_flux)) &
-         allocate (upward_shortwave_flux(isd:ied, jsd:jed, config%nlay + 1))
+         allocate (upward_shortwave_flux(isl:iel, jsl:jel, nlay + 1))
       if (.not. allocated(downward_shortwave_flux)) &
-         allocate (downward_shortwave_flux(isd:ied, jsd:jed, config%nlay + 1))
+         allocate (downward_shortwave_flux(isl:iel, jsl:jel, nlay + 1))
 
       if (.not. allocated(layer_temperature)) &
-         allocate (layer_temperature(isd:ied, jsd:jed, config%nlay))
+         allocate (layer_temperature(isl:iel, jsl:jel, nlay))
       if (.not. allocated(level_temperature)) &
-         allocate (level_temperature(isd:ied, jsd:jed, config%nlay + 1))
+         allocate (level_temperature(isl:iel, jsl:jel, nlay + 1))
 
-      if (.not. allocated(dm)) allocate (dm(config%nlay))
-      if (.not. allocated(flux_up)) allocate (flux_up(config%nlay + 1))
-      if (.not. allocated(flux_dn)) allocate (flux_dn(config%nlay + 1))
-      if (.not. allocated(transmittance)) allocate (transmittance(config%nlay))
-      if (.not. allocated(reflectance)) allocate (reflectance(config%nlay))
-      if (.not. allocated(albedo)) allocate (albedo(config%nlay + 1))
-      if (.not. allocated(emission_up)) allocate (emission_up(config%nlay + 1))
-      if (.not. allocated(beta)) allocate (beta(config%nlay))
-      if (.not. allocated(source_up)) allocate (source_up(config%nlay + 1))
-      if (.not. allocated(source_dn)) allocate (source_dn(config%nlay + 1))
-      if (.not. allocated(solar_beam)) allocate (solar_beam(config%nlay + 1))
+      if (.not. allocated(dm)) allocate (dm(nlay))
+      if (.not. allocated(flux_up)) allocate (flux_up(nlay + 1))
+      if (.not. allocated(flux_dn)) allocate (flux_dn(nlay + 1))
+      if (.not. allocated(transmittance)) allocate (transmittance(nlay))
+      if (.not. allocated(reflectance)) allocate (reflectance(nlay))
+      if (.not. allocated(albedo)) allocate (albedo(nlay + 1))
+      if (.not. allocated(emission_up)) allocate (emission_up(nlay + 1))
+      if (.not. allocated(beta)) allocate (beta(nlay))
+      if (.not. allocated(source_up)) allocate (source_up(nlay + 1))
+      if (.not. allocated(source_dn)) allocate (source_dn(nlay + 1))
+      if (.not. allocated(solar_beam)) allocate (solar_beam(nlay + 1))
 
    end subroutine allocate_radiation_arrays
 

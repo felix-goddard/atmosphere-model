@@ -144,6 +144,7 @@ contains
    subroutine initial_halo_exchange()
 
       call halo_exchange(dp, pt, gz, ud, vd)
+      call halo_exchange(ts)
 
    end subroutine initial_halo_exchange
 
