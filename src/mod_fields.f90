@@ -128,13 +128,13 @@ contains
       pkap(is:ie, js:je, config%nlay + 1) = top_pressure**kappa
 
       call initial_nc%read_axis('xc', coord_points)
-      do j = js, je
-         radius(is:ie, j) = coord_points(is:ie)**2
+      do j = jsd, jed
+         radius(isd:ied, j) = coord_points(isd:ied)**2
       end do
 
       call initial_nc%read_axis('yc', coord_points)
-      do i = is, ie
-         radius(i, js:je) = radius(i, js:je) + coord_points(js:je)**2
+      do i = isd, ied
+         radius(i, jsd:jed) = radius(i, jsd:jed) + coord_points(jsd:jed)**2
       end do
 
       radius(:, :) = sqrt(radius(:, :))

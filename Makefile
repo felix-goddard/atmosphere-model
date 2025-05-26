@@ -29,12 +29,20 @@ $(objdir)/%.o: $(srcdir)/%.f90
 $(objects): $(objdir)/mod_kinds.o
 $(objdir)/mod_netcdf.o: $(srcdir)/mod_netcdf.f90 $(objdir)/mod_log.o
 $(objdir)/mod_output.o: $(srcdir)/mod_output.f90 $(objdir)/mod_netcdf.o
-$(objdir)/mod_config.o: $(srcdir)/mod_config.f90 $(objdir)/mod_log.o $(objdir)/mod_constants.o $(objdir)/mod_util.o
+$(objdir)/mod_config.o: $(srcdir)/mod_config.f90 $(objdir)/mod_log.o \
+                        $(objdir)/mod_constants.o $(objdir)/mod_util.o
 $(objdir)/mod_sync.o: $(srcdir)/mod_sync.f90 $(objdir)/mod_fields.o
-$(objdir)/mod_sw_dyn.o: $(srcdir)/mod_sw_dyn.f90 $(objdir)/mod_fields.o $(objdir)/mod_sync.o
-$(objdir)/mod_radiation.o: $(srcdir)/mod_radiation.f90 $(objdir)/mod_gas_optics.o $(objdir)/mod_solar.o
-$(objdir)/mod_model.o: $(srcdir)/mod_model.f90 $(objdir)/mod_sw_dyn.o $(objdir)/mod_radiation.o $(objdir)/mod_physics.o $(objdir)/mod_sync.o $(objdir)/mod_log.o $(objdir)/mod_input.o $(objdir)/mod_output.o $(objdir)/mod_timing.o
-$(objdir)/mod_fields.o: $(srcdir)/mod_fields.f90 $(objdir)/mod_tiles.o $(objdir)/mod_netcdf.o $(objdir)/mod_sync.o
+$(objdir)/mod_sw_dyn.o: $(srcdir)/mod_sw_dyn.f90 $(objdir)/mod_fields.o \
+                        $(objdir)/mod_sync.o
+$(objdir)/mod_radiation.o: $(srcdir)/mod_radiation.f90 \
+                           $(objdir)/mod_gas_optics.o $(objdir)/mod_solar.o
+$(objdir)/mod_fields.o: $(srcdir)/mod_fields.f90 $(objdir)/mod_tiles.o \
+					   $(objdir)/mod_netcdf.o $(objdir)/mod_sync.o
+$(objdir)/mod_model.o: $(srcdir)/mod_model.f90 $(objdir)/mod_sw_dyn.o \
+					   $(objdir)/mod_radiation.o $(objdir)/mod_physics.o \
+					   $(objdir)/mod_remap.o $(objdir)/mod_sync.o \
+					   $(objdir)/mod_log.o $(objdir)/mod_input.o \
+					   $(objdir)/mod_output.o $(objdir)/mod_timing.o
 $(objdir)/main.o: $(objects)
 
 clean:

@@ -5,11 +5,12 @@
 /
 
 &time_control
-    max_timestep = "PT30S"
-    run_duration = "PT24H"
-    output_interval = "PT30M"
-    radiation_interval = "PT30M"
-    physics_interval = "PT1M"
+    max_timestep = "PT2M"
+    run_duration = "P5D"
+    output_interval = "PT1H"
+    radiation_interval = "PT3H" ! how often radiative fluxes are calculated
+    physics_interval = "PT5M" ! how often physics tendencies are calculated
+    remap_interval = "PT3H" ! how often vertical remapping is performed
 /
 
 &physics_parameters
