@@ -278,11 +278,8 @@ contains
                   k_ext, k_sca, k_abs, &
                   backscatter, gamma1, gamma2, lambda, e_minus, e_2minus, &
                   tmp1, surface_planckian, planckian_difference
-      real(rk), allocatable :: level_planckian(:)
+      real(rk) :: level_planckian(config%nlay + 1)
       integer(ik) :: k
-
-      if (.not. allocated(level_planckian)) &
-         allocate (level_planckian(config%nlay + 1))
 
       surface_planckian = planck_function(g_point, surface_temperature)
       level_planckian(1) = planck_function(g_point, level_temperature(1))
@@ -354,24 +351,26 @@ contains
       ! functions of the atmosphere, following the method of Hogan & Bozzo (2018)
 
       real(rk) :: toa_downward_flux, sfc_albedo, sfc_upward_flux
-      integer(ik) :: k
+      integer(ik) :: k, nlay
+
+      nlay = config%nlay
 
       albedo(1) = sfc_albedo
       emission_up(1) = sfc_upward_flux
 
-      do k = 1, config%nlay
-         beta(k) = 1/(1 - reflectance(k)*albedo(k))
+      do k = 1, nlay
+         beta(k) = 1./(1.-reflectance(k)*albedo(k))
          albedo(k + 1) = reflectance(k) &
-                         + transmittance(k)**2*beta(k)*albedo(k)
+                         + (transmittance(k)**2)*beta(k)*albedo(k)
          emission_up(k + 1) = source_up(k) + transmittance(k)*beta(k)*( &
                               emission_up(k) + source_dn(k)*albedo(k))
       end do
 
-      flux_dn(config%nlay + 1) = toa_downward_flux
-      flux_up(config%nlay + 1) = albedo(config%nlay + 1)*toa_downward_flux &
-                                 + emission_up(config%nlay + 1)
+      flux_dn(nlay + 1) = toa_downward_flux
+      flux_up(nlay + 1) = albedo(nlay + 1)*toa_downward_flux &
+                          + emission_up(nlay + 1)
 
-      do k = config%nlay + 1, 2, -1
+      do k = nlay + 1, 2, -1
          flux_dn(k - 1) = beta(k - 1)*(source_dn(k - 1) &
                                        + transmittance(k - 1)*flux_dn(k) &
                                        + reflectance(k - 1)*emission_up(k - 1))
