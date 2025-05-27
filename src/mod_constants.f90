@@ -8,8 +8,9 @@ module mod_constants
     real(rk), parameter :: pi = 3.1415926535897932384626433
 
     ! physical constants
-    real(rk), parameter :: dry_gas_constant = 287.052874 ! specific gas constant of dry air, J/kg/K
-    real(rk), parameter :: dry_heat_capacity = 1005 ! constant pressure heat capacity of dry air, J/kg/K
+    real(rk), parameter :: R_dry = 287.052874 ! specific gas constant of dry air, J/kg/K
+    real(rk), parameter :: cp_dry = 1005 ! constant pressure heat capacity of dry air, J/kg/K
+    real(rk), parameter :: cv_dry = cp_dry - R_dry ! constant volume heat capacity of dry air, J/kg/K
 
     ! model specific constants
     real(rk) :: top_pressure
@@ -28,7 +29,7 @@ contains
         gravity = g
         coriolis_parameter = f
     
-        kappa = dry_gas_constant / dry_heat_capacity
+        kappa = R_dry / cp_dry
         
     end subroutine set_constants
     

@@ -3,7 +3,7 @@ module mod_remap
    use mod_kinds, only: ik, rk
    use mod_config, only: config => main_config
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_constants, only: dry_heat_capacity, kappa, top_pressure
+   use mod_constants, only: cp_dry, cv_dry, kappa, top_pressure
    use mod_fields, only: dp, pt, ud, vd, gz, plev, pkap, playkap
 
    implicit none
@@ -73,7 +73,7 @@ contains
       do k = 1, nlay
          gz(isl:iel, jsl:jel, k + 1) = &
             gz(isl:iel, jsl:jel, k) &
-            + dry_heat_capacity*pt(isl:iel, jsl:jel, k)*( &
+            + cp_dry*pt(isl:iel, jsl:jel, k)*( &
             pkap(isl:iel, jsl:jel, k) - pkap(isl:iel, jsl:jel, k + 1))
       end do
 
@@ -123,7 +123,7 @@ contains
                      + .125*(vd(i, j - 1, :) + vd(i + 1, j - 1, :) &
                              + vd(i, j + 1, :) + vd(i + 1, j + 1, :)))
 
-            energy(:) = dry_heat_capacity*pt(i, j, :)*playkap(i, j, :) &
+            energy(:) = cv_dry*pt(i, j, :)*playkap(i, j, :) &
                         + .5*(gz(i, j, 2:) + gz(i, j, :nlay) &
                               + ua(:)**2 + va(:)**2)
 
@@ -142,12 +142,12 @@ contains
             do k = 1, nlay
                pt_remap(i, j, k) = &
                   (energy_remap(k) - gz_remap(k) - .5*(ua(k)**2 + va(k)**2)) &
-                  /(dry_heat_capacity*target_playkap(i, j, k) &
-                    + .5*dry_heat_capacity*(target_pkap(i, j, k) &
+                  /(cv_dry*target_playkap(i, j, k) &
+                    + .5*cp_dry*(target_pkap(i, j, k) &
                                             - target_pkap(i, j, k + 1)))
 
                gz_remap(k + 1) = &
-                  gz_remap(k) + dry_heat_capacity*pt_remap(i, j, k) &
+                  gz_remap(k) + cp_dry*pt_remap(i, j, k) &
                   *(target_pkap(i, j, k) - target_pkap(i, j, k + 1))
             end do
 

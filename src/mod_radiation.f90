@@ -3,7 +3,7 @@ module mod_radiation
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
-   use mod_constants, only: pi, kappa, gravity, dry_heat_capacity
+   use mod_constants, only: pi, kappa, gravity
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_sync, only: halo_exchange
    use mod_fields, only: dp, pt, ts, play, playkap, plev, pkap, net_flux
