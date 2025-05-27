@@ -3,8 +3,8 @@ module mod_sw_dyn
    use mod_kinds, only: ik, rk
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
-   use mod_constants, only: gravity, coriolis_parameter, &
-                            kappa, cp_dry, top_pressure
+   use mod_constants, only: gravity, coriolis_parameter, kappa, cp_dry, &
+                            top_pressure, divergence_damping_coeff
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_fields, only: dp, pt, ud, vd, plev, pkap, playkap, gz, net_flux
    use mod_sync, only: halo_exchange
@@ -13,9 +13,11 @@ module mod_sw_dyn
    implicit none
    private
 
-   public :: allocate_sw_dyn_arrays, &
+   public :: init_sw_dyn, &
              cgrid_dynamics_step, cgrid_halo_exchange, &
              dgrid_dynamics_step, dgrid_halo_exchange
+
+   real(rk) :: rdx, rdx2, rdy, rdy2, rdx2rdy2, rA
 
    real(rk), allocatable :: dpc(:, :, :) ! pressure thickness for the C grid half-step
    real(rk), allocatable :: ptc(:, :, :) ! potential temperature for the C grid half-step
@@ -24,6 +26,9 @@ module mod_sw_dyn
 
    real(rk), allocatable :: vorticity(:, :)
    real(rk), allocatable :: kinetic_energy(:, :)
+
+   real(rk) :: divdamp_coeff
+   real(rk), allocatable :: divergence(:, :)
 
    real(rk), allocatable :: pgfx(:, :), pgfy(:, :) ! pressure gradient forces
    real(rk), allocatable :: pkapb(:, :, :), gzb(:, :, :) ! pkap and gz interpolated to B grid
@@ -73,11 +78,10 @@ contains
    subroutine cgrid_dynamics_step(dt)
       real(rk), intent(in) :: dt
       integer(ik) :: i, j, k
-      real(rk) :: dtdx, dtdy, rA
+      real(rk) :: dtdx, dtdy
 
       dtdx = dt/config%dx
       dtdy = dt/config%dy
-      rA = 1./(config%dx*config%dy)
 
       ! calculate pressure on the layer interfaces
       do k = config%nlay, 1, -1
@@ -397,11 +401,10 @@ contains
    subroutine dgrid_dynamics_step(dt)
       real(rk), intent(in) :: dt
       integer(ik) :: i, j, k
-      real(rk) :: dtdx, dtdy, rA
+      real(rk) :: dtdx, dtdy
 
-      dtdx = dt/config%dx
-      dtdy = dt/config%dy
-      rA = 1./(config%dx*config%dy)
+      dtdx = dt*rdx
+      dtdy = dt*rdy
 
       do k = 1, config%nlay
 
@@ -621,6 +624,29 @@ contains
                            + pkapb(i, j, k) - pkapb(i, j + 1, k + 1))
          end do
 
+         ! compute the divergence of the prognostic winds
+         do concurrent(i=is + 4:ie - 4, j=js + 4:je - 4)
+            divergence(i, j) = rdx*(ud(i, j, k) - ud(i - 1, j, k)) &
+                               + rdy*(vd(i, j, k) - vd(i, j - 1, k))
+         end do
+
+         ! calculate ∇²(divergence)
+         do concurrent(i=is + 5:ie - 5, j=js + 5:je - 5)
+            tmp(i, j) = -2.*divergence(i, j)*rdx2rdy2 &
+                        + (divergence(i + 1, j) + divergence(i - 1, j))*rdx2 &
+                        + (divergence(i, j + 1) + divergence(i, j - 1))*rdy2
+         end do
+
+         ! calculate ∇⁴(divergence)
+         do concurrent(i=is + 6:ie - 6, j=js + 6:je - 6)
+            divergence(i, j) = -2.*tmp(i, j)*rdx2rdy2 &
+                               + (tmp(i + 1, j) + tmp(i - 1, j))*rdx2 &
+                               + (tmp(i, j + 1) + tmp(i, j - 1))*rdy2
+         end do
+
+         divergence(is + 6:ie - 6, js + 6:je - 6) = &
+            divdamp_coeff*divergence(is + 6:ie - 6, js + 6:je - 6)
+
          ! ===========================================================================
          ! Update the prognostic D grid u (`ud`)
 
@@ -647,6 +673,8 @@ contains
                              + dt*vc(i, j, k)*fy(j) &
                              - dtdx*(kinetic_energy(i + 1, j) &
                                      - kinetic_energy(i, j) &
+                                     - divergence(i + 1, j) &
+                                     + divergence(i, j) &
                                      - pgfx(i, j))
             end do
          end do
@@ -677,6 +705,8 @@ contains
                              - dt*uc(i, j, k)*fx(i) &
                              - dtdy*(kinetic_energy(i, j + 1) &
                                      - kinetic_energy(i, j) &
+                                     - divergence(i, j + 1) &
+                                     + divergence(i, j) &
                                      - pgfy(i, j))
             end do
          end do
@@ -868,7 +898,14 @@ contains
 
    end subroutine interpolate_to_corners
 
-   subroutine allocate_sw_dyn_arrays()
+   subroutine init_sw_dyn()
+
+      rdx = 1./config%dx
+      rdx2 = 1./(config%dx*config%dx)
+      rdy = 1./config%dy
+      rdy2 = 1./(config%dy*config%dy)
+      rdx2rdy2 = rdx2 + rdy2
+      rA = 1./(config%dx*config%dy)
 
       if (.not. allocated(dpc)) allocate (dpc(is:ie, js:je, 1:config%nlay))
       if (.not. allocated(ptc)) allocate (ptc(is:ie, js:je, 1:config%nlay))
@@ -878,6 +915,7 @@ contains
       if (.not. allocated(vorticity)) allocate (vorticity(is:ie, js:je))
       if (.not. allocated(kinetic_energy)) &
          allocate (kinetic_energy(is:ie, js:je))
+      if (.not. allocated(divergence)) allocate (divergence(is:ie, js:je))
 
       if (.not. allocated(heating_rate)) &
          allocate (heating_rate(is:ie, js:je, 1:config%nlay))
@@ -916,6 +954,8 @@ contains
       if (.not. allocated(edge_L)) allocate (edge_L(min(is, js):max(ie, je)))
       if (.not. allocated(edge_R)) allocate (edge_R(min(is, js):max(ie, je)))
 
-   end subroutine allocate_sw_dyn_arrays
+      divdamp_coeff = (divergence_damping_coeff*config%dx*config%dy)**2
+
+   end subroutine init_sw_dyn
 
 end module mod_sw_dyn

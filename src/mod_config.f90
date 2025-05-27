@@ -43,9 +43,11 @@ contains
       namelist /time_control/ max_timestep, run_duration, output_interval, &
          radiation_interval, physics_interval, remap_interval
 
-      real(rk) :: top_pressure, gravity, coriolis_parameter
+      real(rk) :: top_pressure, gravity, coriolis_parameter, &
+                  divergence_damping_coefficient
       namelist /physics_parameters/ &
-         top_pressure, gravity, coriolis_parameter
+         top_pressure, gravity, coriolis_parameter, &
+         divergence_damping_coefficient
 
       open (newunit=fileunit, file=filename, status='old', action='read')
 
@@ -84,7 +86,8 @@ contains
                     dt_max, dt_output, dt_radiation, dt_physics, dt_remap, &
                     0, t_final, -1, -1, -1, -1, -1, -1, -1)
 
-      call set_constants(top_pressure, gravity, coriolis_parameter)
+      call set_constants(top_pressure, gravity, coriolis_parameter, &
+                         divergence_damping_coefficient)
 
    end subroutine read_config_file
 

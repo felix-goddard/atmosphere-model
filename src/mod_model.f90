@@ -9,7 +9,7 @@ module mod_model
    use mod_tiles, only: init_tiles
    use mod_fields, only: init_prognostic_fields, initial_halo_exchange, &
                          check_stability
-   use mod_sw_dyn, only: allocate_sw_dyn_arrays, &
+   use mod_sw_dyn, only: init_sw_dyn, &
                          cgrid_dynamics_step, cgrid_halo_exchange, &
                          dgrid_dynamics_step, dgrid_halo_exchange
    use mod_radiation, only: allocate_radiation_arrays, &
@@ -64,7 +64,7 @@ contains
       call initial_halo_exchange()
       call timing_off('HALO EXCHANGE')
 
-      call allocate_sw_dyn_arrays()
+      call init_sw_dyn()
       call allocate_radiation_arrays()
       call allocate_physics_arrays()
       call allocate_remapping_arrays()

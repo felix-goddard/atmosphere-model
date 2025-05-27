@@ -16,18 +16,20 @@ module mod_constants
     real(rk) :: top_pressure
     real(rk) :: gravity
     real(rk) :: coriolis_parameter
+    real(rk) :: divergence_damping_coeff
 
     ! derived constants
     real(rk) :: kappa
     
 contains
 
-    subroutine set_constants(ptop, g, f)
-        real(rk), intent(in) :: ptop, g, f
+    subroutine set_constants(ptop, g, f, divergence_damping)
+        real(rk), intent(in) :: ptop, g, f, divergence_damping
 
         top_pressure = ptop
         gravity = g
         coriolis_parameter = f
+        divergence_damping_coeff = divergence_damping
     
         kappa = R_dry / cp_dry
         
