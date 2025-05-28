@@ -45,8 +45,9 @@ module mod_netcdf
       procedure :: create_variable, get_variable_index
       generic :: write_variable => write_2d_variable, write_3d_variable
       procedure, private :: write_2d_variable, write_3d_variable
-      generic :: read_variable => read_2d_variable, read_3d_variable
-      procedure, private :: read_2d_variable, read_3d_variable
+      generic :: read_variable => &
+         read_1d_variable, read_2d_variable, read_3d_variable
+      procedure, private :: read_1d_variable, read_2d_variable, read_3d_variable
    end type
 
 contains
@@ -500,6 +501,27 @@ contains
       call handle_netcdf_error(status, 'write_3d_variable')
 
    end subroutine write_3d_variable
+
+   subroutine read_1d_variable(self, name, data)
+      class(netcdf_file), intent(in) :: self
+      character(len=*), intent(in) :: name
+      real(rk), intent(inout) :: data(:)
+      integer(ik) :: status, idx
+
+      idx = self%get_variable_index(name)
+
+      if (idx == -1) then
+         write (log_str, '(a)') 'Unknown variable `'//trim(name)//'`.'
+         call logger%fatal('read_1d_variable', log_str)
+         call abort_now()
+      end if
+
+      status = nf90_get_var( &
+               self%ncid, self%vars(idx)%varid, data)
+
+      call handle_netcdf_error(status, 'read_1d_variable')
+
+   end subroutine read_1d_variable
 
    subroutine read_2d_variable(self, name, data)
       class(netcdf_file), intent(in) :: self

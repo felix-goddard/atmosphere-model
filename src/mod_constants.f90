@@ -11,27 +11,21 @@ module mod_constants
     real(rk), parameter :: R_dry = 287.052874 ! specific gas constant of dry air, J/kg/K
     real(rk), parameter :: cp_dry = 1005 ! constant pressure heat capacity of dry air, J/kg/K
     real(rk), parameter :: cv_dry = cp_dry - R_dry ! constant volume heat capacity of dry air, J/kg/K
+    real(rk), parameter :: kappa = R_dry / cp_dry
 
     ! model specific constants
-    real(rk) :: top_pressure
     real(rk) :: gravity
     real(rk) :: coriolis_parameter
     real(rk) :: divergence_damping_coeff
-
-    ! derived constants
-    real(rk) :: kappa
     
 contains
 
-    subroutine set_constants(ptop, g, f, divergence_damping)
-        real(rk), intent(in) :: ptop, g, f, divergence_damping
+    subroutine set_constants(g, f, divergence_damping)
+        real(rk), intent(in) :: g, f, divergence_damping
 
-        top_pressure = ptop
         gravity = g
         coriolis_parameter = f
         divergence_damping_coeff = divergence_damping
-    
-        kappa = R_dry / cp_dry
         
     end subroutine set_constants
     

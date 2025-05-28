@@ -5,10 +5,10 @@ module mod_model
    use mod_timing, only: timing_on, timing_off
    use mod_config, only: config => main_config, read_config_file
    use mod_netcdf, only: netcdf_file
-   use mod_input, only: read_initial_file
+   use mod_input, only: read_initial_file, init_prognostic_fields, &
+                        initial_halo_exchange
    use mod_tiles, only: init_tiles
-   use mod_fields, only: init_prognostic_fields, initial_halo_exchange, &
-                         check_stability
+   use mod_fields, only: check_stability
    use mod_sw_dyn, only: init_sw_dyn, &
                          cgrid_dynamics_step, cgrid_halo_exchange, &
                          dgrid_dynamics_step, dgrid_halo_exchange

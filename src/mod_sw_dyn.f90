@@ -4,9 +4,10 @@ module mod_sw_dyn
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
    use mod_constants, only: gravity, coriolis_parameter, kappa, cp_dry, &
-                            top_pressure, divergence_damping_coeff
+                            divergence_damping_coeff
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_fields, only: dp, pt, ud, vd, plev, pkap, playkap, gz, net_flux
+   use mod_fields, only: dp, pt, ud, vd, plev, pkap, playkap, gz, net_flux, &
+                         coord_Ak, coord_Bk
    use mod_sync, only: halo_exchange
    use mod_util, only: abort_now
 
@@ -19,26 +20,27 @@ module mod_sw_dyn
 
    real(rk) :: rdx, rdx2, rdy, rdy2, rdx2rdy2, rA
 
-   real(rk), allocatable :: dpc(:, :, :) ! pressure thickness for the C grid half-step
-   real(rk), allocatable :: ptc(:, :, :) ! potential temperature for the C grid half-step
-   real(rk), allocatable :: uc(:, :, :) ! u wind on C grid
-   real(rk), allocatable :: vc(:, :, :) ! v wind on C grid
+   real(rk), allocatable :: &
+      dpc(:, :, :), & ! pressure thickness for the C grid half-step
+      ptc(:, :, :), & ! potential temperature for the C grid half-step
+      uc(:, :, :), & ! u wind on C grid
+      vc(:, :, :) ! v wind on C grid
 
-   real(rk), allocatable :: vorticity(:, :)
-   real(rk), allocatable :: kinetic_energy(:, :)
+   real(rk), allocatable :: vorticity(:, :), kinetic_energy(:, :)
 
    real(rk) :: divdamp_coeff
    real(rk), allocatable :: divergence(:, :)
 
-   real(rk), allocatable :: pgfx(:, :), pgfy(:, :) ! pressure gradient forces
-   real(rk), allocatable :: pkapb(:, :, :), gzb(:, :, :) ! pkap and gz interpolated to B grid
+   real(rk), allocatable :: &
+      pgfx(:, :), pgfy(:, :), & ! pressure gradient forces
+      pkapb(:, :, :), gzb(:, :, :), & ! pkap and gz interpolated to B grid
+      heating_rate(:, :, :) ! potential temperature heating rate (K/s)
 
-   real(rk), allocatable :: heating_rate(:, :, :) ! potential temperature heating rate (K/s)
-
-   real(rk), allocatable :: ua(:, :) ! u wind on A grid
-   real(rk), allocatable :: va(:, :) ! v wind on A grid
-   real(rk), allocatable :: ub(:, :) ! u wind on B grid
-   real(rk), allocatable :: vb(:, :) ! v wind on B grid
+   real(rk), allocatable :: &
+      ua(:, :), & ! u wind on A grid
+      va(:, :), & ! v wind on A grid
+      ub(:, :), & ! u wind on B grid
+      vb(:, :) ! v wind on B grid
 
    ! These variables are correlated as follows:
    !
@@ -928,7 +930,7 @@ contains
          allocate (gzb(is:ie, js:je, 1:config%nlay + 1))
 
       ! the top pressure is constant so no need to interpolate
-      pkapb(is:ie, js:je, config%nlay + 1) = top_pressure**kappa
+      pkapb(is:ie, js:je, config%nlay + 1) = coord_Ak(1)**kappa
 
       ! the surface geopotential is constant so we can interpolate it once
       ! at the start and be done

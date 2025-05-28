@@ -3,20 +3,22 @@ module mod_remap
    use mod_kinds, only: ik, rk
    use mod_config, only: config => main_config
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
-   use mod_constants, only: cp_dry, cv_dry, kappa, top_pressure
-   use mod_fields, only: dp, pt, ud, vd, gz, plev, pkap, playkap
+   use mod_constants, only: cp_dry, cv_dry, kappa
+   use mod_fields, only: dp, pt, ud, vd, gz, plev, pkap, playkap, &
+                         coord_Ak, coord_Bk
 
    implicit none
    private
 
    public :: allocate_remapping_arrays, perform_vertical_remapping
 
-   real(rk), allocatable :: u_remap(:, :, :)
-   real(rk), allocatable :: v_remap(:, :, :)
-   real(rk), allocatable :: pt_remap(:, :, :)
+   real(rk) :: top_pressure
 
-   real(rk), allocatable :: target_plev(:, :, :), target_pkap(:, :, :), &
-                            target_playkap(:, :, :)
+   real(rk), allocatable :: &
+      u_remap(:, :, :), v_remap(:, :, :), pt_remap(:, :, :)
+
+   real(rk), allocatable :: &
+      target_plev(:, :, :), target_pkap(:, :, :), target_playkap(:, :, :)
 
    real(rk), allocatable :: btm_edge(:), top_edge(:), curvature(:)
 
@@ -36,9 +38,7 @@ contains
       jsl = jsd - 3
       jel = jed + 3
 
-      ! calculate the current vertical grid (pressure levels) and the target
-      ! grid; we must ensure that the current and target grids coincide
-      ! at the top and bottom
+      ! calculate the current vertical grid (pressure levels)
       do k = nlay, 1, -1
          plev(isl:iel, jsl:jel, k) = &
             plev(isl:iel, jsl:jel, k + 1) + dp(isl:iel, jsl:jel, k)
@@ -51,12 +51,12 @@ contains
          playkap(isl:iel, jsl:jel, k) = &
             (pkap(isl:iel, jsl:jel, k + 1) - pkap(isl:iel, jsl:jel, k)) &
             /plog(isl:iel, jsl:jel)
+      end do
 
-         ! currently: remap so that every dp is equal
+      ! calculate the target vertical grid
+      do k = nlay, 1, -1
          target_plev(isl:iel, jsl:jel, k) = &
-            target_plev(isl:iel, jsl:jel, k + 1) &
-            + (plev(isl:iel, jsl:jel, 1) &
-               - plev(isl:iel, jsl:jel, nlay + 1))/nlay
+            coord_Ak(k) + coord_Bk(k)*(plev(isl:iel, jsl:jel, 1) - top_pressure)
 
          target_pkap(isl:iel, jsl:jel, k) = &
             target_plev(isl:iel, jsl:jel, k)**kappa
@@ -144,7 +144,7 @@ contains
                   (energy_remap(k) - gz_remap(k) - .5*(ua(k)**2 + va(k)**2)) &
                   /(cv_dry*target_playkap(i, j, k) &
                     + .5*cp_dry*(target_pkap(i, j, k) &
-                                            - target_pkap(i, j, k + 1)))
+                                 - target_pkap(i, j, k + 1)))
 
                gz_remap(k + 1) = &
                   gz_remap(k) + cp_dry*pt_remap(i, j, k) &
@@ -359,6 +359,7 @@ contains
       integer(ik) :: nlay
 
       nlay = config%nlay
+      top_pressure = coord_Ak(1)
 
       ! we have to remap u and v over a slightly larger domain so that we
       ! can calculate the kinetic energy of the remapped winds over the actual
