@@ -4585,7 +4585,8 @@ contains
       integer(ik) :: k
 
       if (pressure < pressures(1) .or. pressure > pressures(n_pressures)) then
-         write (log_str, '(a)') 'Pressure is outside supported range.'
+         write (log_str, '(f10.2,a)') &
+            pressure, ' Pa is outside supported pressure range.'
          call logger%fatal('lookup_pT_table', log_str)
          call abort_now()
       end if

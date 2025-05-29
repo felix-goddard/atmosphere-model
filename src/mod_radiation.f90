@@ -112,6 +112,7 @@ contains
       downward_shortwave_flux(:, :, :) = 0.
       upward_longwave_flux(:, :, :) = 0.
       downward_longwave_flux(:, :, :) = 0.
+      net_flux(:, :, :) = 0.
 
       do i = isl, iel
          do j = jsl, jel

@@ -87,12 +87,8 @@ contains
 
       ! calculate pressure on the layer interfaces
       do k = config%nlay, 1, -1
-         plev(is:ie, js:je, k) = &
-            plev(is:ie, js:je, k + 1) &
-            + dp(is:ie, js:je, k)
-
-         pkap(is:ie, js:je, k) = &
-            plev(is:ie, js:je, k)**kappa
+         plev(is:ie, js:je, k) = plev(is:ie, js:je, k + 1) + dp(is:ie, js:je, k)
+         pkap(is:ie, js:je, k) = plev(is:ie, js:je, k)**kappa
       end do
 
       do k = 1, config%nlay
@@ -102,7 +98,7 @@ contains
          ! range that the D grid potential temperature gets updated on
          playkap(is:ie, js:je, k) = &
             (pkap(is:ie, js:je, k + 1) - pkap(is:ie, js:je, k)) &
-            /(log(plev(is:ie, js:je, k + 1)/plev(is:ie, js:je, k))*kappa)
+            /log(pkap(is:ie, js:je, k + 1)/pkap(is:ie, js:je, k))
 
          heating_rate(is:ie, js:je, k) = &
             (net_flux(is:ie, js:je, k + 1) - net_flux(is:ie, js:je, k)) &
@@ -206,9 +202,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 2, je - 2
-               tmp(i, j) = .5*( &
-                           pt(i, j, k) + denom_y(i, j)*( &
-                           pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(pt(i, j, k) + denom_y(i, j) &
+                               *(pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
             end do
          end do
 
@@ -231,9 +226,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 2, ie - 2
-               tmp(i, j) = .5*( &
-                           pt(i, j, k) + denom_x(i, j)*( &
-                           pt(i, j, k) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(pt(i, j, k) + denom_x(i, j) &
+                               *(pt(i, j, k) - rA*(fx(i + 1) - fx(i))))
             end do
          end do
 
@@ -340,9 +334,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 3, ie - 3
-               tmp(i, j) = .5*( &
-                           vorticity(i, j) + denom_x(i, j)*( &
-                           vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(vorticity(i, j) + denom_x(i, j) &
+                               *(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
             end do
          end do
 
@@ -370,9 +363,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 3, je - 3
-               tmp(i, j) = .5*( &
-                           vorticity(i, j) + denom_y(i, j)*( &
-                           vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(vorticity(i, j) + denom_y(i, j) &
+                               *(vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
             end do
          end do
 
@@ -408,6 +400,13 @@ contains
       dtdx = dt*rdx
       dtdy = dt*rdy
 
+      ! calculate pressure on the layer interfaces
+      do k = config%nlay, 1, -1
+         plev(is:ie, js:je, k) = plev(is:ie, js:je, k + 1) &
+                                 + dpc(is:ie, js:je, k)
+         pkap(is:ie, js:je, k) = plev(is:ie, js:je, k)**kappa
+      end do
+
       do k = 1, config%nlay
 
          do concurrent(i=is + 1:ie, j=js + 1:je)
@@ -425,6 +424,16 @@ contains
             denom_y(i, j) = 1./(1.-dtdy*(vc(i, j + 1, k) - vc(i, j, k)))
          end do
 
+         ! Calculate the rate of change of potential temperature for this layer.
+         playkap(is:ie, js:je, k) = &
+            (pkap(is:ie, js:je, k + 1) - pkap(is:ie, js:je, k)) &
+            /log(pkap(is:ie, js:je, k + 1)/pkap(is:ie, js:je, k))
+
+         heating_rate(is:ie, js:je, k) = &
+            (net_flux(is:ie, js:je, k + 1) - net_flux(is:ie, js:je, k)) &
+            /(cp_dry*dpc(is:ie, js:je, k)/gravity) &
+            /playkap(is:ie, js:je, k)
+
          ! ===========================================================================
          ! Update the prognostic dp field
 
@@ -435,9 +444,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 1, je - 1
-               tmp(i, j) = .5*( &
-                           dp(i, j, k) + denom_y(i, j)*( &
-                           dp(i, j, k) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(dp(i, j, k) + denom_y(i, j) &
+                               *(dp(i, j, k) - rA*(fy(j + 1) - fy(j))))
             end do
          end do
 
@@ -462,9 +470,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 1, ie - 1
-               tmp(i, j) = .5*( &
-                           dp(i, j, k) + denom_x(i, j)*( &
-                           dp(i, j, k) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(dp(i, j, k) + denom_x(i, j) &
+                               *(dp(i, j, k) - rA*(fx(i + 1) - fx(i))))
             end do
          end do
 
@@ -492,9 +499,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 1, je - 1
-               tmp(i, j) = .5*( &
-                           pt(i, j, k) + denom_y(i, j)*( &
-                           pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(pt(i, j, k) + denom_y(i, j) &
+                               *(pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
             end do
          end do
 
@@ -517,9 +523,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 1, ie - 1
-               tmp(i, j) = .5*( &
-                           pt(i, j, k) + denom_x(i, j)*( &
-                           pt(i, j, k) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(pt(i, j, k) + denom_x(i, j) &
+                               *(pt(i, j, k) - rA*(fx(i + 1) - fx(i))))
             end do
          end do
 

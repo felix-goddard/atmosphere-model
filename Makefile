@@ -1,6 +1,12 @@
 fc := caf
 fcflags := -O3 -I/opt/homebrew/include -fimplicit-none -fbackslash -g
-debug_flags := -Dno_nans -fbacktrace -fbounds-check -fcheck=all -ffpe-trap=zero,invalid,overflow,underflow -Waliasing -Wcharacter-truncation -Wimplicit-interface -Wintrinsics-std -Wline-truncation -Wintrinsic-shadow -Wconversion -Wsurprising -Wunused -std=gnu -fmax-errors=5 -Warray-bounds -Wextra -Wall -pedantic
+debug_flags := -Dno_nans -fbacktrace -fbounds-check -fcheck=all -Waliasing \
+			   -Wcharacter-truncation -Wimplicit-interface -Wintrinsics-std \
+			   -Wline-truncation -Wintrinsic-shadow -Wconversion -Wsurprising \
+			   -Wunused -std=gnu -fmax-errors=5 -Warray-bounds -Wextra -Wall \
+			   -pedantic
+# Ideally we would also use the -ffpe-trap=zero,invalid,overflow,underflow flag
+# but that has issues on my machine that leads to an illegal instruction :(
 fclibs := -L/opt/homebrew/lib/ -L/opt/homebrew/include -lnetcdff
 rm := rm -f
 
