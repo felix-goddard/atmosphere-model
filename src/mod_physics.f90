@@ -83,7 +83,7 @@ contains
       real(rk), parameter :: critical_richardson_number = .25
       real(rk), parameter :: mixing_timescale = 600 ! 10 minutes
 
-      do concurrent(i=isd:ied, j=jsd:jed)
+      do concurrent(i=isd - 2:ied + 2, j=jsd - 2:jed + 2)
 
          ! we mix the energy instead of the potential temperature to ensure
          ! we conserve energy
@@ -127,9 +127,9 @@ contains
          end do
 
          u_tend(i, j, :) = &
-            u_tend(i, j, :) + (u_adj(:) - ua(i, j, k))/mixing_timescale
+            u_tend(i, j, :) + (u_adj(:) - ua(i, j, :))/mixing_timescale
          v_tend(i, j, :) = &
-            v_tend(i, j, :) + (v_adj(:) - va(i, j, k))/mixing_timescale
+            v_tend(i, j, :) + (v_adj(:) - va(i, j, :))/mixing_timescale
 
          ! reconstruct the potential temperature from the new energy
 
@@ -161,11 +161,26 @@ contains
 
    subroutine apply_physics_tendencies(dt)
       real(rk), intent(in) :: dt
+      integer(ik) :: i, j
 
-      dp(isd:ied, jsd:jed, :) = dp(isd:ied, jsd:jed, :) + dt*dp_tend(:, :, :)
-      pt(isd:ied, jsd:jed, :) = pt(isd:ied, jsd:jed, :) + dt*pt_tend(:, :, :)
+      dp(isd:ied, jsd:jed, :) = dp(isd:ied, jsd:jed, :) &
+                                + dt*dp_tend(isd:ied, jsd:jed, :)
 
-      ts(isd:ied, jsd:jed) = ts(isd:ied, jsd:jed) + dt*ts_tend(:, :)
+      pt(isd:ied, jsd:jed, :) = pt(isd:ied, jsd:jed, :) &
+                                + dt*pt_tend(isd:ied, jsd:jed, :)
+
+      ts(isd:ied, jsd:jed) = ts(isd:ied, jsd:jed) &
+                             + dt*ts_tend(isd:ied, jsd:jed)
+
+      do concurrent(i=isd:ied, j=jsd:jed)
+         ud(i, j, :) = ud(i, j, :) + dt*( &
+                       (7./12.)*(u_tend(i, j, :) + u_tend(i, j - 1, :)) &
+                       - (1./12.)*(u_tend(i, j + 1, :) + u_tend(i, j - 2, :)))
+
+         vd(i, j, :) = vd(i, j, :) + dt*( &
+                       (7./12.)*(v_tend(i, j, :) + v_tend(i - 1, j, :)) &
+                       - (1./12.)*(v_tend(i + 1, j, :) + v_tend(i - 2, j, :)))
+      end do
 
    end subroutine apply_physics_tendencies
 
@@ -176,16 +191,22 @@ contains
    end subroutine physics_halo_exchange
 
    subroutine allocate_physics_arrays()
+      integer(ik) :: isl, iel, jsl, jel
+
+      isl = isd - 2
+      iel = ied + 2
+      jsl = jsd - 2
+      jel = jed + 2
 
       if (.not. allocated(dp_tend)) &
-         allocate (dp_tend(isd:ied, jsd:jed, config%nlay))
+         allocate (dp_tend(isl:iel, jsl:jel, config%nlay))
       if (.not. allocated(pt_tend)) &
-         allocate (pt_tend(isd:ied, jsd:jed, config%nlay))
+         allocate (pt_tend(isl:iel, jsl:jel, config%nlay))
       if (.not. allocated(u_tend)) &
-         allocate (u_tend(isd:ied, jsd:jed, config%nlay))
+         allocate (u_tend(isl:iel, jsl:jel, config%nlay))
       if (.not. allocated(v_tend)) &
-         allocate (v_tend(isd:ied, jsd:jed, config%nlay))
-      if (.not. allocated(ts_tend)) allocate (ts_tend(isd:ied, jsd:jed))
+         allocate (v_tend(isl:iel, jsl:jel, config%nlay))
+      if (.not. allocated(ts_tend)) allocate (ts_tend(isl:iel, jsl:jel))
 
       if (.not. allocated(ua)) allocate (ua(is:ie, js:je, config%nlay))
       if (.not. allocated(va)) allocate (va(is:ie, js:je, config%nlay))
