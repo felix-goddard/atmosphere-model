@@ -16,6 +16,6 @@
 &physics_parameters
     gravity = 9.807 ! acceleration due to gravity, m/s2
     coriolis_parameter = 1e-5  ! coriolis parameter, 1/s
-    divergence_damping_coefficient = 0.15 ! controls the strength of divergence
-                                          ! damping, dimensionless
+    divergence_damping_coefficient = 0.15
+    vorticity_damping_coefficient = 0.005
 /

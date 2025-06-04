@@ -4,7 +4,7 @@ module mod_sw_dyn
    use mod_log, only: logger => main_logger, log_str
    use mod_config, only: config => main_config
    use mod_constants, only: gravity, coriolis_parameter, kappa, cp_dry, &
-                            divergence_damping_coeff
+                            divergence_damping_coeff, vorticity_damping_coeff
    use mod_tiles, only: is, ie, js, je, isd, ied, jsd, jed
    use mod_fields, only: dp, pt, ud, vd, plev, pkap, playkap, gz, net_flux, &
                          coord_Ak, coord_Bk
@@ -28,8 +28,8 @@ module mod_sw_dyn
 
    real(rk), allocatable :: vorticity(:, :), kinetic_energy(:, :)
 
-   real(rk) :: divdamp_coeff
-   real(rk), allocatable :: divergence(:, :)
+   real(rk) :: divdamp_coeff, vortdamp_xcoeff, vortdamp_ycoeff
+   real(rk), allocatable :: divergence(:, :), laplacian(:, :)
 
    real(rk), allocatable :: &
       pgfx(:, :), pgfy(:, :), & ! pressure gradient forces
@@ -82,8 +82,8 @@ contains
       integer(ik) :: i, j, k
       real(rk) :: dtdx, dtdy
 
-      dtdx = dt/config%dx
-      dtdy = dt/config%dy
+      dtdx = dt*rdx
+      dtdy = dt*rdy
 
       ! calculate pressure on the layer interfaces
       do k = config%nlay, 1, -1
@@ -145,9 +145,12 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 2, je - 2
-               tmp(i, j) = .5*( &
-                           dp(i, j, k) + denom_y(i, j)*( &
-                           dp(i, j, k) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(dp(i, j, k) + denom_y(i, j)*( &
+                               dp(i, j, k) - rA*(fy(j + 1) - fy(j))))
+
+               laplacian(i, j) = -2.*dp(i, j, k)*rdx2rdy2 &
+                                 + (dp(i + 1, j, k) + dp(i - 1, j, k))*rdx2 &
+                                 + (dp(i, j + 1, k) + dp(i, j - 1, k))*rdy2
             end do
          end do
 
@@ -157,12 +160,16 @@ contains
                       cx(is + 2:ie - 2, j), is + 2, ie - 2, &
                       variant=PPM_UNCONSTRAINED)
 
+            dpfx(is + 5, j) = fx(is + 5)*cx(is + 5, j)
             do i = is + 5, ie - 5
-               dpfx(i, j) = fx(i)*cx(i, j)
+               dpfx(i + 1, j) = fx(i + 1)*cx(i + 1, j)
+
                dpc(i, j, k) = dp(i, j, k) - ( &
-                              fx(i + 1)*cx(i + 1, j) - fx(i)*cx(i, j))
+                              dpfx(i + 1, j) - dpfx(i, j) &
+                              + dtdx*vortdamp_xcoeff*(laplacian(i + 1, j) &
+                                                      - 2.*laplacian(i, j) &
+                                                      + laplacian(i - 1, j)))
             end do
-            dpfx(ie - 4, j) = fx(ie - 4)*cx(ie - 4, j)
          end do
 
          ! calculate the inner step (in the x-direction) for the outer y-direction step
@@ -172,9 +179,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 2, ie - 2
-               tmp(i, j) = .5*( &
-                           dp(i, j, k) + denom_x(i, j)*( &
-                           dp(i, j, k) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(dp(i, j, k) + denom_x(i, j)*( &
+                               dp(i, j, k) - rA*(fx(i + 1) - fx(i))))
             end do
          end do
 
@@ -184,12 +190,16 @@ contains
                       cy(i, js + 2:je - 2), js + 2, je - 2, &
                       variant=PPM_UNCONSTRAINED)
 
+            dpfy(i, js + 5) = fy(js + 5)*cy(i, js + 5)
             do j = js + 5, je - 5
-               dpfy(i, j) = fy(j)*cy(i, j)
+               dpfy(i, j + 1) = fy(j + 1)*cy(i, j + 1)
+
                dpc(i, j, k) = dpc(i, j, k) - ( &
-                              fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
+                              dpfy(i, j + 1) - dpfy(i, j) &
+                              + dtdy*vortdamp_ycoeff*(laplacian(i, j + 1) &
+                                                      - 2.*laplacian(i, j) &
+                                                      + laplacian(i, j - 1)))
             end do
-            dpfy(i, je - 4) = fy(je - 4)*cy(i, je - 4)
          end do
 
          ! ===========================================================================
@@ -204,6 +214,10 @@ contains
             do j = js + 2, je - 2
                tmp(i, j) = .5*(pt(i, j, k) + denom_y(i, j) &
                                *(pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
+
+               laplacian(i, j) = -2.*pt(i, j, k)*rdx2rdy2 &
+                                 + (pt(i + 1, j, k) + pt(i - 1, j, k))*rdx2 &
+                                 + (pt(i, j + 1, k) + pt(i, j - 1, k))*rdy2
             end do
          end do
 
@@ -214,8 +228,12 @@ contains
                       variant=PPM_UNCONSTRAINED)
 
             do i = is + 5, ie - 5
-               ptc(i, j, k) = dp(i, j, k)*pt(i, j, k) &
-                              - (fx(i + 1)*dpfx(i + 1, j) - fx(i)*dpfx(i, j))
+               ptc(i, j, k) = &
+                  dp(i, j, k)*pt(i, j, k) &
+                  - (fx(i + 1)*dpfx(i + 1, j) - fx(i)*dpfx(i, j) &
+                     + vortdamp_xcoeff*( &
+                     (laplacian(i + 1, j) - laplacian(i, j))*dpfx(i + 1, j) &
+                     - (laplacian(i, j) - laplacian(i - 1, j))*dpfx(i, j)))
             end do
          end do
 
@@ -238,10 +256,14 @@ contains
                       variant=PPM_UNCONSTRAINED)
 
             do j = js + 5, je - 5
-               ptc(i, j, k) = (ptc(i, j, k) &
-                               - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*heating_rate(i, j, k) &
-                               )/dpc(i, j, k)
+               ptc(i, j, k) = &
+                  (ptc(i, j, k) &
+                   - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j) &
+                      + vortdamp_ycoeff*( &
+                      (laplacian(i, j + 1) - laplacian(i, j))*dpfy(i, j + 1) &
+                      - (laplacian(i, j) - laplacian(i, j - 1))*dpfy(i, j))) &
+                   + dt*dp(i, j, k)*heating_rate(i, j, k) &
+                   )/dpc(i, j, k)
             end do
          end do
 
@@ -296,8 +318,8 @@ contains
 
          do concurrent(i=is + 2:ie - 2, j=js + 2:je - 2)
             vorticity(i, j) = coriolis_parameter &
-                              - (uc(i, j, k) - uc(i, j - 1, k))/config%dy &
-                              + (vc(i, j, k) - vc(i - 1, j, k))/config%dx
+                              - (uc(i, j, k) - uc(i, j - 1, k))*rdy &
+                              + (vc(i, j, k) - vc(i - 1, j, k))*rdx
          end do
 
          do concurrent(i=is + 7:ie - 7, j=js + 7:je - 7)
@@ -336,6 +358,11 @@ contains
             do i = is + 3, ie - 3
                tmp(i, j) = .5*(vorticity(i, j) + denom_x(i, j) &
                                *(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
+
+               laplacian(i, j) = &
+                  -2.*vorticity(i, j)*rdx2rdy2 &
+                  + (vorticity(i + 1, j) + vorticity(i - 1, j))*rdx2 &
+                  + (vorticity(i, j + 1) + vorticity(i, j - 1))*rdy2
             end do
          end do
 
@@ -345,11 +372,12 @@ contains
                       variant=PPM_UNCONSTRAINED)
 
             do j = js + 7, je - 7
-               uc(i, j, k) = uc(i, j, k) &
-                             + dt*vd(i, j, k)*fy(j) &
-                             - dtdx*(kinetic_energy(i, j) &
-                                     - kinetic_energy(i - 1, j) &
-                                     - pgfx(i, j))
+               uc(i, j, k) = &
+                  uc(i, j, k) &
+                  + dt*(vd(i, j, k)*fy(j) + vortdamp_ycoeff*( &
+                        laplacian(i, j + 1) - laplacian(i, j))) &
+                  - dtdx*(kinetic_energy(i, j) - kinetic_energy(i - 1, j) &
+                          - pgfx(i, j))
             end do
          end do
 
@@ -374,11 +402,12 @@ contains
                       variant=PPM_UNCONSTRAINED)
 
             do i = is + 7, ie - 7
-               vc(i, j, k) = vc(i, j, k) &
-                             - dt*ud(i, j, k)*fx(i) &
-                             - dtdy*(kinetic_energy(i, j) &
-                                     - kinetic_energy(i, j - 1) &
-                                     - pgfy(i, j))
+               vc(i, j, k) = &
+                  vc(i, j, k) &
+                  - dt*(ud(i, j, k)*fx(i) + vortdamp_xcoeff*( &
+                        laplacian(i + 1, j) - laplacian(i, j))) &
+                  - dtdy*(kinetic_energy(i, j) - kinetic_energy(i, j - 1) &
+                          - pgfy(i, j))
             end do
          end do
 
@@ -439,13 +468,16 @@ contains
 
          ! calculate the inner step (in the y-direction) for the outer x-direction step
          do i = is + 1, ie - 1
-            call flux(fy(js:je), dp(i, js:je, k), &
-                      cy(i, js:je), js, je, &
+            call flux(fy(js:je), dp(i, js:je, k), cy(i, js:je), js, je, &
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 1, je - 1
                tmp(i, j) = .5*(dp(i, j, k) + denom_y(i, j) &
                                *(dp(i, j, k) - rA*(fy(j + 1) - fy(j))))
+
+               laplacian(i, j) = -2.*dp(i, j, k)*rdx2rdy2 &
+                                 + (dp(i + 1, j, k) + dp(i - 1, j, k))*rdx2 &
+                                 + (dp(i, j + 1, k) + dp(i, j - 1, k))*rdy2
             end do
          end do
 
@@ -455,18 +487,21 @@ contains
                       cx(is + 1:ie - 1, j), is + 1, ie - 1, &
                       variant=PPM_NONNEGATIVE)
 
+            dpfx(is + 4, j) = fx(is + 4)*cx(is + 4, j)
             do i = is + 4, ie - 4
-               dpfx(i, j) = fx(i)*cx(i, j)
+               dpfx(i + 1, j) = fx(i + 1)*cx(i + 1, j)
+
                dpc(i, j, k) = dp(i, j, k) - ( &
-                              fx(i + 1)*cx(i + 1, j) - fx(i)*cx(i, j))
+                              dpfx(i + 1, j) - dpfx(i, j) &
+                              + dtdx*vortdamp_xcoeff*(laplacian(i + 1, j) &
+                                                      - 2.*laplacian(i, j) &
+                                                      + laplacian(i - 1, j)))
             end do
-            dpfx(ie - 3, j) = fx(ie - 3)*cx(ie - 3, j)
          end do
 
          ! calculate the inner step (in the x-direction) for the outer y-direction step
          do j = js + 1, je - 1
-            call flux(fx(is:ie), dp(is:ie, j, k), &
-                      cx(is:ie, j), is, ie, &
+            call flux(fx(is:ie), dp(is:ie, j, k), cx(is:ie, j), is, ie, &
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 1, ie - 1
@@ -481,12 +516,16 @@ contains
                       cy(i, js + 1:je - 1), js + 1, je - 1, &
                       variant=PPM_NONNEGATIVE)
 
+            dpfy(i, js + 4) = fy(js + 4)*cy(i, js + 4)
             do j = js + 4, je - 4
-               dpfy(i, j) = fy(j)*cy(i, j)
+               dpfy(i, j + 1) = fy(j + 1)*cy(i, j + 1)
+
                dpc(i, j, k) = dpc(i, j, k) - ( &
-                              fy(j + 1)*cy(i, j + 1) - fy(j)*cy(i, j))
+                              dpfy(i, j + 1) - dpfy(i, j) &
+                              + dtdy*vortdamp_ycoeff*(laplacian(i, j + 1) &
+                                                      - 2.*laplacian(i, j) &
+                                                      + laplacian(i, j - 1)))
             end do
-            dpfy(i, je - 3) = fy(je - 3)*cy(i, je - 3)
          end do
 
          ! ===========================================================================
@@ -494,13 +533,16 @@ contains
 
          ! calculate the inner step (in the y-direction) for the outer x-direction step
          do i = is + 1, ie - 1
-            call flux(fy(js:je), pt(i, js:je, k), &
-                      cy(i, js:je), js, je, &
+            call flux(fy(js:je), pt(i, js:je, k), cy(i, js:je), js, je, &
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 1, je - 1
                tmp(i, j) = .5*(pt(i, j, k) + denom_y(i, j) &
                                *(pt(i, j, k) - rA*(fy(j + 1) - fy(j))))
+
+               laplacian(i, j) = -2.*pt(i, j, k)*rdx2rdy2 &
+                                 + (pt(i + 1, j, k) + pt(i - 1, j, k))*rdx2 &
+                                 + (pt(i, j + 1, k) + pt(i, j - 1, k))*rdy2
             end do
          end do
 
@@ -511,15 +553,18 @@ contains
                       variant=PPM_NONNEGATIVE)
 
             do i = is + 4, ie - 4
-               ptc(i, j, k) = dp(i, j, k)*pt(i, j, k) &
-                              - (fx(i + 1)*dpfx(i + 1, j) - fx(i)*dpfx(i, j))
+               ptc(i, j, k) = &
+                  dp(i, j, k)*pt(i, j, k) &
+                  - (fx(i + 1)*dpfx(i + 1, j) - fx(i)*dpfx(i, j) &
+                     + vortdamp_xcoeff*( &
+                     (laplacian(i + 1, j) - laplacian(i, j))*dpfx(i + 1, j) &
+                     - (laplacian(i, j) - laplacian(i - 1, j))*dpfx(i, j)))
             end do
          end do
 
          ! calculate the inner step (in the x-direction) for the outer y-direction step
          do j = js + 1, je - 1
-            call flux(fx(is:ie), pt(is:ie, j, k), &
-                      cx(is:ie, j), is, ie, &
+            call flux(fx(is:ie), pt(is:ie, j, k), cx(is:ie, j), is, ie, &
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 1, ie - 1
@@ -535,12 +580,14 @@ contains
                       variant=PPM_NONNEGATIVE)
 
             do j = js + 4, je - 4
-               ! We re-use the heating rate we calculated in the C grid step,
-               ! since it probably hasn't changed much
-               ptc(i, j, k) = (ptc(i, j, k) &
-                               - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j)) &
-                               + dt*dp(i, j, k)*heating_rate(i, j, k) &
-                               )/dpc(i, j, k)
+               ptc(i, j, k) = &
+                  (ptc(i, j, k) &
+                   - (fy(j + 1)*dpfy(i, j + 1) - fy(j)*dpfy(i, j) &
+                      + vortdamp_ycoeff*( &
+                      (laplacian(i, j + 1) - laplacian(i, j))*dpfy(i, j + 1) &
+                      - (laplacian(i, j) - laplacian(i, j - 1))*dpfy(i, j))) &
+                   + dt*dp(i, j, k)*heating_rate(i, j, k) &
+                   )/dpc(i, j, k)
             end do
          end do
 
@@ -611,8 +658,8 @@ contains
 
          do concurrent(i=is + 1:ie - 1, j=js + 1:je - 1)
             vorticity(i, j) = coriolis_parameter &
-                              - (ud(i, j + 1, k) - ud(i, j, k))/config%dy &
-                              + (vd(i + 1, j, k) - vd(i, j, k))/config%dx
+                              - (ud(i, j + 1, k) - ud(i, j, k))*rdy &
+                              + (vd(i + 1, j, k) - vd(i, j, k))*rdx
          end do
 
          do concurrent(i=is + 7:ie - 7, j=js + 7:je - 7)
@@ -664,9 +711,13 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do i = is + 4, ie - 4
-               tmp(i, j) = &
-                  .5*(vorticity(i, j) + &
-                      denom_x(i, j)*(vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
+               tmp(i, j) = .5*(vorticity(i, j) + denom_x(i, j)*( &
+                               vorticity(i, j) - rA*(fx(i + 1) - fx(i))))
+
+               laplacian(i, j) = &
+                  -2.*vorticity(i, j)*rdx2rdy2 &
+                  + (vorticity(i + 1, j) + vorticity(i - 1, j))*rdx2 &
+                  + (vorticity(i, j + 1) + vorticity(i, j - 1))*rdy2
             end do
          end do
 
@@ -676,13 +727,13 @@ contains
                       variant=PPM_CONSTRAINED)
 
             do j = js + 7, je - 7
-               ud(i, j, k) = ud(i, j, k) &
-                             + dt*vc(i, j, k)*fy(j) &
-                             - dtdx*(kinetic_energy(i + 1, j) &
-                                     - kinetic_energy(i, j) &
-                                     - divergence(i + 1, j) &
-                                     + divergence(i, j) &
-                                     - pgfx(i, j))
+               ud(i, j, k) = &
+                  ud(i, j, k) &
+                  + dt*(vc(i, j, k)*fy(j) + vortdamp_ycoeff*( &
+                        laplacian(i, j) - laplacian(i, j - 1))) &
+                  - dtdx*(kinetic_energy(i + 1, j) - kinetic_energy(i, j) &
+                          - divergence(i + 1, j) + divergence(i, j) &
+                          - pgfx(i, j))
             end do
          end do
 
@@ -696,9 +747,8 @@ contains
                       variant=PIECEWISE_CONSTANT)
 
             do j = js + 4, je - 4
-               tmp(i, j) = &
-                  .5*(vorticity(i, j) + &
-                      denom_y(i, j)*(vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
+               tmp(i, j) = .5*(vorticity(i, j) + denom_y(i, j)*( &
+                               vorticity(i, j) - rA*(fy(j + 1) - fy(j))))
             end do
          end do
 
@@ -708,13 +758,13 @@ contains
                       variant=PPM_CONSTRAINED)
 
             do i = is + 7, ie - 7
-               vd(i, j, k) = vd(i, j, k) &
-                             - dt*uc(i, j, k)*fx(i) &
-                             - dtdy*(kinetic_energy(i, j + 1) &
-                                     - kinetic_energy(i, j) &
-                                     - divergence(i, j + 1) &
-                                     + divergence(i, j) &
-                                     - pgfy(i, j))
+               vd(i, j, k) = &
+                  vd(i, j, k) &
+                  - dt*(uc(i, j, k)*fx(i) + vortdamp_xcoeff*( &
+                        laplacian(i, j) - laplacian(i - 1, j))) &
+                  - dtdy*(kinetic_energy(i, j + 1) - kinetic_energy(i, j) &
+                          - divergence(i, j + 1) + divergence(i, j) &
+                          - pgfy(i, j))
             end do
          end do
 
@@ -906,6 +956,7 @@ contains
    end subroutine interpolate_to_corners
 
    subroutine init_sw_dyn()
+      real(rk) :: vortdamp_coeff
 
       rdx = 1./config%dx
       rdx2 = 1./(config%dx*config%dx)
@@ -922,7 +973,9 @@ contains
       if (.not. allocated(vorticity)) allocate (vorticity(is:ie, js:je))
       if (.not. allocated(kinetic_energy)) &
          allocate (kinetic_energy(is:ie, js:je))
+
       if (.not. allocated(divergence)) allocate (divergence(is:ie, js:je))
+      if (.not. allocated(laplacian)) allocate (laplacian(is:ie, js:je))
 
       if (.not. allocated(heating_rate)) &
          allocate (heating_rate(is:ie, js:je, 1:config%nlay))
@@ -962,6 +1015,10 @@ contains
       if (.not. allocated(edge_R)) allocate (edge_R(min(is, js):max(ie, je)))
 
       divdamp_coeff = (divergence_damping_coeff*config%dx*config%dy)**2
+
+      vortdamp_coeff = vorticity_damping_coeff*config%dx*config%dy
+      vortdamp_xcoeff = config%dy*rdx*vortdamp_coeff
+      vortdamp_ycoeff = config%dx*rdy*vortdamp_coeff
 
    end subroutine init_sw_dyn
 

@@ -17,15 +17,17 @@ module mod_constants
     real(rk) :: gravity
     real(rk) :: coriolis_parameter
     real(rk) :: divergence_damping_coeff
+    real(rk) :: vorticity_damping_coeff
     
 contains
 
-    subroutine set_constants(g, f, divergence_damping)
-        real(rk), intent(in) :: g, f, divergence_damping
+    subroutine set_constants(g, f, divergence_damping, vorticity_damping)
+        real(rk), intent(in) :: g, f, divergence_damping, vorticity_damping
 
         gravity = g
         coriolis_parameter = f
         divergence_damping_coeff = divergence_damping
+        vorticity_damping_coeff = vorticity_damping
         
     end subroutine set_constants
     
